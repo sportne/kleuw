@@ -47,7 +47,7 @@
     },
     {
       "id": "T-003",
-      "status": "To Do",
+      "status": "complete",
       "title": "Implement JSON schema loader and validator",
       "description": "Implement utilities in schema.py to load spec/kleuw.schema.json and validate a project JSON structure. Provide a function validate_project(data: dict) -> list[str] that returns a list of validation error messages (empty if valid).",
       "depends_on": [

@@ -111,7 +111,7 @@ disallow_incomplete_defs = false
 minversion = "7.0"
 testpaths = ["tests"]
 pythonpath = ["src"]
-addopts = "-ra --cov=kleuw --cov-report=term-missing --cov-fail-under=80"
+addopts = "-ra -p kleuw.pytest_plugin --cov=kleuw --cov-report=term-missing --cov-fail-under=80"
 markers = [
   "gui: marks tests that exercise the Tkinter GUI (may be skipped on headless CI)",
 ]
