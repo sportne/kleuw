@@ -1,0 +1,190 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/sportne/kleuw/spec/kleuw.schema.json",
+  "title": "Kleuw Project Schema",
+  "description": "JSON Schema for Kleuw project files (schema version 1).",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "version": {
+      "type": "integer",
+      "const": 1
+    },
+    "files": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/FileEntry" }
+    },
+    "links": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/LinkEntry" }
+    },
+    "metadata": {
+      "type": "object",
+      "additionalProperties": true
+    }
+  },
+  "required": ["version", "files", "links"],
+
+  "$defs": {
+    "Hash": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "algo": {
+          "type": "string",
+          "minLength": 1
+        },
+        "value": {
+          "type": "string",
+          "pattern": "^[0-9a-fA-F]+$",
+          "minLength": 16
+        }
+      },
+      "required": ["algo", "value"]
+    },
+
+    "LineSpan": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "start": { "type": "integer", "minimum": 1 },
+        "end":   { "type": "integer", "minimum": 1 }
+      },
+      "required": ["start"]
+    },
+
+    "FileEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "hash": {
+          "$ref": "#/$defs/Hash"
+        },
+        "lang": {
+          "type": "string",
+          "minLength": 1
+        },
+        "note": { "type": "string" },
+        "aliases": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      },
+      "required": ["id", "path"]
+    },
+
+    "TargetSrc": {
+      "type": "object",
+      "additionalProperties": false,
+      "oneOf": [
+        {
+          "properties": {
+            "file_id": { "type": "string", "minLength": 1 },
+            "lines": { "$ref": "#/$defs/LineSpan" },
+            "src_region_hash": { "$ref": "#/$defs/Hash" }
+          },
+          "required": ["file_id"],
+          "not": { "required": ["path"] }
+        },
+        {
+          "properties": {
+            "path": { "type": "string", "minLength": 1 },
+            "lines": { "$ref": "#/$defs/LineSpan" },
+            "src_region_hash": { "$ref": "#/$defs/Hash" }
+          },
+          "required": ["path"],
+          "not": { "required": ["file_id"] }
+        }
+      ]
+    },
+
+    "TargetDst": {
+      "type": "object",
+      "additionalProperties": false,
+      "oneOf": [
+        {
+          "properties": {
+            "file_id": { "type": "string", "minLength": 1 },
+            "lines": { "$ref": "#/$defs/LineSpan" },
+            "dst_region_hash": { "$ref": "#/$defs/Hash" }
+          },
+          "required": ["file_id"],
+          "not": { "required": ["path"] }
+        },
+        {
+          "properties": {
+            "path": { "type": "string", "minLength": 1 },
+            "lines": { "$ref": "#/$defs/LineSpan" },
+            "dst_region_hash": { "$ref": "#/$defs/Hash" }
+          },
+          "required": ["path"],
+          "not": { "required": ["file_id"] }
+        }
+      ]
+    },
+
+    "LinkEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "refers_to",
+            "defines",
+            "declares",
+            "implements",
+            "tests",
+            "depends_on",
+            "duplicates",
+            "mentions",
+            "fixes",
+            "blocks",
+            "derives_from",
+            "verifies",
+            "builds",
+            "documents",
+            "relates_to"
+          ]
+        },
+        "src": { "$ref": "#/$defs/TargetSrc" },
+        "dst": { "$ref": "#/$defs/TargetDst" },
+        "directed": {
+          "type": "boolean",
+          "default": true
+        },
+        "created": {
+          "type": "string"
+        },
+        "author": {
+          "type": "string"
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^\\S+$",
+            "minLength": 1
+          }
+        },
+        "note": { "type": "string" }
+      },
+      "required": ["id", "type", "src", "dst"]
+    }
+  }
+}
