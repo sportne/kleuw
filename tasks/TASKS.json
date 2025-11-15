@@ -5,7 +5,7 @@
   "tasks": [
     {
       "id": "T-001",
-      "status": "To Do",
+      "status": "complete",
       "title": "Bootstrap Python package structure",
       "description": "Create the base src/kleuw package layout, including __init__.py and empty module stubs matching the spec (cli, gui, model, schema, hashing, staleness, io, project, utils).",
       "depends_on": [],
