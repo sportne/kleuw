@@ -65,7 +65,7 @@
     },
     {
       "id": "T-004",
-      "status": "To Do",
+      "status": "complete",
       "title": "Implement project IO helpers",
       "description": "In io.py, implement functions to load and save Kleuw project files: load_project(path) -> Project and save_project(path, project). Handle JSON parsing, basic validation via schema.validate_project, and clear error reporting.",
       "depends_on": [
