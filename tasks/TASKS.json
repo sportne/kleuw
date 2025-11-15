@@ -84,7 +84,7 @@
     },
     {
       "id": "T-005",
-      "status": "To Do",
+      "status": "complete",
       "title": "Implement project-level operations",
       "description": "In project.py, implement a Project façade class or helper functions for managing files and links (add_file, add_link, find_file_by_id, etc.) to encapsulate core operations used by CLI and GUI.",
       "depends_on": [
