@@ -119,7 +119,7 @@
     },
     {
       "id": "T-007",
-      "status": "To Do",
+      "status": "complete",
       "title": "Implement staleness detection logic",
       "description": "In staleness.py, implement functions to determine whether a link is stale by recomputing region hashes and comparing them with stored values, handling missing files, invalid ranges, and decode errors.",
       "depends_on": [
