@@ -1,0 +1,468 @@
+{
+  "version": 1,
+  "project": "kleuw",
+  "description": "Implementation task breakdown for the Kleuw project, suitable for AI agents and humans.",
+  "tasks": [
+    {
+      "id": "T-001",
+      "status": "To Do",
+      "title": "Bootstrap Python package structure",
+      "description": "Create the base src/kleuw package layout, including __init__.py and empty module stubs matching the spec (cli, gui, model, schema, hashing, staleness, io, project, utils).",
+      "depends_on": [],
+      "files": [
+        "src/kleuw/__init__.py",
+        "src/kleuw/cli.py",
+        "src/kleuw/gui.py",
+        "src/kleuw/model.py",
+        "src/kleuw/schema.py",
+        "src/kleuw/hashing.py",
+        "src/kleuw/staleness.py",
+        "src/kleuw/io.py",
+        "src/kleuw/project.py",
+        "src/kleuw/utils.py"
+      ],
+      "category": "scaffolding",
+      "spec_refs": [
+        "spec/kleuw_overall_spec.md",
+        "spec/kleuw_requirements.md"
+      ],
+      "est_size": "S"
+    },
+    {
+      "id": "T-002",
+      "status": "To Do",
+      "title": "Implement core data models",
+      "description": "Implement Python dataclasses or equivalent structures in model.py for files, links, targets, line spans, and region hashes, matching the schema described in kleuw_schema.md.",
+      "depends_on": [
+        "T-001"
+      ],
+      "files": [
+        "src/kleuw/model.py"
+      ],
+      "category": "model",
+      "spec_refs": [
+        "spec/kleuw_schema.md"
+      ],
+      "est_size": "M"
+    },
+    {
+      "id": "T-003",
+      "status": "To Do",
+      "title": "Implement JSON schema loader and validator",
+      "description": "Implement utilities in schema.py to load spec/kleuw.schema.json and validate a project JSON structure. Provide a function validate_project(data: dict) -> list[str] that returns a list of validation error messages (empty if valid).",
+      "depends_on": [
+        "T-001"
+      ],
+      "files": [
+        "src/kleuw/schema.py",
+        "spec/kleuw.schema.json"
+      ],
+      "category": "schema",
+      "spec_refs": [
+        "spec/kleuw_schema.md"
+      ],
+      "est_size": "M"
+    },
+    {
+      "id": "T-004",
+      "status": "To Do",
+      "title": "Implement project IO helpers",
+      "description": "In io.py, implement functions to load and save Kleuw project files: load_project(path) -> Project and save_project(path, project). Handle JSON parsing, basic validation via schema.validate_project, and clear error reporting.",
+      "depends_on": [
+        "T-002",
+        "T-003"
+      ],
+      "files": [
+        "src/kleuw/io.py"
+      ],
+      "category": "io",
+      "spec_refs": [
+        "spec/kleuw_schema.md",
+        "spec/kleuw_requirements.md"
+      ],
+      "est_size": "M"
+    },
+    {
+      "id": "T-005",
+      "status": "To Do",
+      "title": "Implement project-level operations",
+      "description": "In project.py, implement a Project façade class or helper functions for managing files and links (add_file, add_link, find_file_by_id, etc.) to encapsulate core operations used by CLI and GUI.",
+      "depends_on": [
+        "T-002",
+        "T-004"
+      ],
+      "files": [
+        "src/kleuw/project.py"
+      ],
+      "category": "model",
+      "spec_refs": [
+        "spec/kleuw_requirements.md"
+      ],
+      "est_size": "M"
+    },
+    {
+      "id": "T-006",
+      "status": "To Do",
+      "title": "Implement region and file hashing utilities",
+      "description": "In hashing.py, implement functions to compute region hashes and optional file hashes following the normalization rules (UTF-8, universal newlines, 1-based line ranges, no trimming).",
+      "depends_on": [
+        "T-002"
+      ],
+      "files": [
+        "src/kleuw/hashing.py"
+      ],
+      "category": "hashing",
+      "spec_refs": [
+        "spec/kleuw_staleness.md"
+      ],
+      "est_size": "M"
+    },
+    {
+      "id": "T-007",
+      "status": "To Do",
+      "title": "Implement staleness detection logic",
+      "description": "In staleness.py, implement functions to determine whether a link is stale by recomputing region hashes and comparing them with stored values, handling missing files, invalid ranges, and decode errors.",
+      "depends_on": [
+        "T-002",
+        "T-006"
+      ],
+      "files": [
+        "src/kleuw/staleness.py"
+      ],
+      "category": "staleness",
+      "spec_refs": [
+        "spec/kleuw_staleness.md"
+      ],
+      "est_size": "M"
+    },
+    {
+      "id": "T-008",
+      "status": "To Do",
+      "title": "Implement CLI scaffolding and argument parsing",
+      "description": "In cli.py, set up the top-level argparse structure with subcommands (init, add-file, list-files, create-link, list-links, check, recompute, validate, export), including a main() entry point, and minimal stubs for each subcommand.",
+      "depends_on": [
+        "T-001",
+        "T-004",
+        "T-005"
+      ],
+      "files": [
+        "src/kleuw/cli.py"
+      ],
+      "category": "cli",
+      "spec_refs": [
+        "spec/kleuw_cli.md"
+      ],
+      "est_size": "M"
+    },
+    {
+      "id": "T-009",
+      "status": "To Do",
+      "title": "Implement CLI: init and add-file commands",
+      "description": "Implement the behavior for `kleuw init` and `kleuw add-file` using the IO and project helpers. Ensure proper error reporting and JSON project initialization.",
+      "depends_on": [
+        "T-008"
+      ],
+      "files": [
+        "src/kleuw/cli.py"
+      ],
+      "category": "cli",
+      "spec_refs": [
+        "spec/kleuw_cli.md"
+      ],
+      "est_size": "M"
+    },
+    {
+      "id": "T-010",
+      "status": "To Do",
+      "title": "Implement CLI: list-files and list-links",
+      "description": "Implement listing commands with both human-readable table output and optional --json output consistent with the schema.",
+      "depends_on": [
+        "T-009"
+      ],
+      "files": [
+        "src/kleuw/cli.py"
+      ],
+      "category": "cli",
+      "spec_refs": [
+        "spec/kleuw_cli.md"
+      ],
+      "est_size": "M"
+    },
+    {
+      "id": "T-011",
+      "status": "To Do",
+      "title": "Implement CLI: create-link",
+      "description": "Implement the `create-link` command to parse region syntax, create link objects, compute region hashes, and append them to the project.",
+      "depends_on": [
+        "T-006",
+        "T-008"
+      ],
+      "files": [
+        "src/kleuw/cli.py"
+      ],
+      "category": "cli",
+      "spec_refs": [
+        "spec/kleuw_cli.md",
+        "spec/kleuw_staleness.md"
+      ],
+      "est_size": "L"
+    },
+    {
+      "id": "T-012",
+      "status": "To Do",
+      "title": "Implement CLI: check and recompute",
+      "description": "Implement the `check` command to run staleness detection and the `recompute` command to update stored region hashes as a new baseline, including appropriate exit codes and JSON output.",
+      "depends_on": [
+        "T-007",
+        "T-008"
+      ],
+      "files": [
+        "src/kleuw/cli.py"
+      ],
+      "category": "cli",
+      "spec_refs": [
+        "spec/kleuw_cli.md",
+        "spec/kleuw_staleness.md"
+      ],
+      "est_size": "L"
+    },
+    {
+      "id": "T-013",
+      "status": "To Do",
+      "title": "Implement CLI: validate and export",
+      "description": "Implement the `validate` and `export` commands to check project structure and produce summaries (JSON, CSV, text).",
+      "depends_on": [
+        "T-003",
+        "T-008"
+      ],
+      "files": [
+        "src/kleuw/cli.py"
+      ],
+      "category": "cli",
+      "spec_refs": [
+        "spec/kleuw_cli.md",
+        "spec/kleuw_schema.md"
+      ],
+      "est_size": "M"
+    },
+    {
+      "id": "T-014",
+      "status": "To Do",
+      "title": "Implement basic GUI shell",
+      "description": "In gui.py, create the Tkinter main window, menu bar, toolbar, files panel, link workspace shell, and status bar as described in the UI spec, with placeholder callbacks.",
+      "depends_on": [
+        "T-001",
+        "T-005"
+      ],
+      "files": [
+        "src/kleuw/gui.py"
+      ],
+      "category": "gui",
+      "spec_refs": [
+        "spec/kleuw_ui.md"
+      ],
+      "est_size": "L"
+    },
+    {
+      "id": "T-015",
+      "status": "To Do",
+      "title": "Implement GUI file loading and side-by-side viewers",
+      "description": "Implement functionality to load files into left/right text viewers with line numbers, scrollbars, and basic navigation.",
+      "depends_on": [
+        "T-014"
+      ],
+      "files": [
+        "src/kleuw/gui.py"
+      ],
+      "category": "gui",
+      "spec_refs": [
+        "spec/kleuw_ui.md"
+      ],
+      "est_size": "L"
+    },
+    {
+      "id": "T-016",
+      "status": "To Do",
+      "title": "Implement GUI line selection and relationship creation UI",
+      "description": "Implement line-range selection in both viewers, relationship type combo box, swap button, and create-link button wiring to the underlying project/link creation logic.",
+      "depends_on": [
+        "T-006",
+        "T-015"
+      ],
+      "files": [
+        "src/kleuw/gui.py"
+      ],
+      "category": "gui",
+      "spec_refs": [
+        "spec/kleuw_ui.md",
+        "spec/kleuw_staleness.md"
+      ],
+      "est_size": "XL"
+    },
+    {
+      "id": "T-017",
+      "status": "To Do",
+      "title": "Implement GUI links panel and navigation to linked regions",
+      "description": "Implement a tabular links panel, enabling selection of a link to load corresponding files and scroll to their line ranges. Support delete and edit operations.",
+      "depends_on": [
+        "T-016"
+      ],
+      "files": [
+        "src/kleuw/gui.py"
+      ],
+      "category": "gui",
+      "spec_refs": [
+        "spec/kleuw_ui.md"
+      ],
+      "est_size": "L"
+    },
+    {
+      "id": "T-018",
+      "status": "To Do",
+      "title": "Implement GUI staleness check integration",
+      "description": "Wire the staleness detection logic into the GUI, including Check Staleness toolbar button, dialog summary, and visual marking of stale links.",
+      "depends_on": [
+        "T-007",
+        "T-017"
+      ],
+      "files": [
+        "src/kleuw/gui.py"
+      ],
+      "category": "gui",
+      "spec_refs": [
+        "spec/kleuw_ui.md",
+        "spec/kleuw_staleness.md"
+      ],
+      "est_size": "M"
+    },
+    {
+      "id": "T-019",
+      "status": "To Do",
+      "title": "Add core unit tests for models and schema validation",
+      "description": "Create tests for model creation, serialization/deserialization, and schema validation, ensuring invalid structures are properly reported.",
+      "depends_on": [
+        "T-002",
+        "T-003",
+        "T-004"
+      ],
+      "files": [
+        "tests/test_model.py",
+        "tests/test_schema.py",
+        "tests/test_io.py"
+      ],
+      "category": "testing",
+      "spec_refs": [
+        "spec/kleuw_schema.md"
+      ],
+      "est_size": "M"
+    },
+    {
+      "id": "T-020",
+      "status": "To Do",
+      "title": "Add unit tests for hashing and staleness logic",
+      "description": "Create tests that cover the normalization rules, region hashing for various line ranges, and staleness determination cases (file missing, invalid range, hash mismatch).",
+      "depends_on": [
+        "T-006",
+        "T-007"
+      ],
+      "files": [
+        "tests/test_hashing.py",
+        "tests/test_staleness.py"
+      ],
+      "category": "testing",
+      "spec_refs": [
+        "spec/kleuw_staleness.md"
+      ],
+      "est_size": "M"
+    },
+    {
+      "id": "T-021",
+      "status": "To Do",
+      "title": "Add unit tests for CLI commands",
+      "description": "Write tests for the CLI using subprocess or Python-level invocation, verifying behavior of init, add-file, list, create-link, check, recompute, validate, and export commands.",
+      "depends_on": [
+        "T-009",
+        "T-010",
+        "T-011",
+        "T-012",
+        "T-013"
+      ],
+      "files": [
+        "tests/test_cli.py"
+      ],
+      "category": "testing",
+      "spec_refs": [
+        "spec/kleuw_cli.md"
+      ],
+      "est_size": "L"
+    },
+    {
+      "id": "T-022",
+      "status": "To Do",
+      "title": "Add basic GUI tests (headless-safe)",
+      "description": "Implement a minimal set of GUI tests that can run in a headless environment where possible, and gracefully skip when Tk cannot initialize.",
+      "depends_on": [
+        "T-014",
+        "T-015"
+      ],
+      "files": [
+        "tests/test_gui.py"
+      ],
+      "category": "testing",
+      "spec_refs": [
+        "spec/kleuw_ui.md"
+      ],
+      "est_size": "M"
+    },
+    {
+      "id": "T-023",
+      "status": "To Do",
+      "title": "Create example project and sample files",
+      "description": "Populate the examples/ directory with a sample Kleuw project JSON and a small set of files demonstrating links, including stale and fresh relationships.",
+      "depends_on": [
+        "T-004",
+        "T-006",
+        "T-007"
+      ],
+      "files": [
+        "examples/sample_project.json",
+        "examples/sample_files/example_source.txt",
+        "examples/sample_files/example_spec.md"
+      ],
+      "category": "examples",
+      "spec_refs": [
+        "spec/kleuw_schema.md",
+        "spec/kleuw_staleness.md"
+      ],
+      "est_size": "M"
+    },
+    {
+      "id": "T-024",
+      "status": "To Do",
+      "title": "Align documentation with implementation",
+      "description": "Review the spec documents (requirements, schema, CLI, UI, staleness) and update them to reflect any implementation decisions or deviations discovered during development.",
+      "depends_on": [
+        "T-001",
+        "T-013",
+        "T-018",
+        "T-021"
+      ],
+      "files": [
+        "spec/kleuw_overall_spec.md",
+        "spec/kleuw_requirements.md",
+        "spec/kleuw_schema.md",
+        "spec/kleuw_cli.md",
+        "spec/kleuw_ui.md",
+        "spec/kleuw_staleness.md",
+        "README.md",
+        "CONTRIBUTING.md",
+        "AGENTS.md"
+      ],
+      "category": "docs",
+      "spec_refs": [
+        "spec/kleuw_overall_spec.md"
+      ],
+      "est_size": "M"
+    }
+  ]
+}
