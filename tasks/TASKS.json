@@ -137,7 +137,7 @@
     },
     {
       "id": "T-008",
-      "status": "To Do",
+      "status": "complete",
       "title": "Implement CLI scaffolding and argument parsing",
       "description": "In cli.py, set up the top-level argparse structure with subcommands (init, add-file, list-files, create-link, list-links, check, recompute, validate, export), including a main() entry point, and minimal stubs for each subcommand.",
       "depends_on": [
