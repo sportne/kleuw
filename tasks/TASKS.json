@@ -102,7 +102,7 @@
     },
     {
       "id": "T-006",
-      "status": "To Do",
+      "status": "complete",
       "title": "Implement region and file hashing utilities",
       "description": "In hashing.py, implement functions to compute region hashes and optional file hashes following the normalization rules (UTF-8, universal newlines, 1-based line ranges, no trimming).",
       "depends_on": [
