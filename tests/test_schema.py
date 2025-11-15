@@ -2,7 +2,11 @@
 
 from __future__ import annotations
 
+import pytest
+
 from kleuw import schema
+
+pytestmark = pytest.mark.gui
 
 
 def test_load_schema_returns_expected_structure() -> None:
