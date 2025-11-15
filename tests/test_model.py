@@ -12,8 +12,6 @@ from kleuw.model import (
     Target,
 )
 
-pytestmark = pytest.mark.gui
-
 
 def test_hash_digest_requires_hex() -> None:
     digest = HashDigest(algo="sha256", value="abcdef")
