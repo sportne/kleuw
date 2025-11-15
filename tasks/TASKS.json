@@ -30,7 +30,7 @@
     },
     {
       "id": "T-002",
-      "status": "To Do",
+      "status": "complete",
       "title": "Implement core data models",
       "description": "Implement Python dataclasses or equivalent structures in model.py for files, links, targets, line spans, and region hashes, matching the schema described in kleuw_schema.md.",
       "depends_on": [
