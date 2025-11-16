@@ -18,7 +18,7 @@ from .hashing import compute_file_hash, compute_region_hash
 from .io import ProjectIOError, load_project, save_project
 from .model import FileEntry, HashDigest, LineSpan, Link, LinkType, RegionHash, Target
 from .project import Project
-from .staleness import check_link_staleness
+from .staleness import LinkStalenessResult, check_link_staleness
 
 __all__ = ["build_parser", "main", "DEFAULT_PARSER"]
 
@@ -399,8 +399,6 @@ def _region_hash_from_mapping(data: object) -> RegionHash:
 def _normalize_hash_object(value: object | None) -> tuple[str, str] | None:
     """Return a ``(algo, value)`` tuple for hash-like ``value``."""
 
-    if value is None:
-        return None
     if isinstance(value, (HashDigest, RegionHash)):
         return value.algo, value.value
     if isinstance(value, Mapping):
@@ -409,6 +407,128 @@ def _normalize_hash_object(value: object | None) -> tuple[str, str] | None:
         if isinstance(algo, str) and isinstance(digest_value, str):
             return algo, digest_value
     return None
+
+
+def _build_file_lookup(project: Project) -> dict[str, Mapping[str, Any]]:
+    """Return a mapping of file identifiers to their serialized entries."""
+
+    lookup: dict[str, Mapping[str, Any]] = {}
+    for entry in project.files:
+        if not isinstance(entry, Mapping):
+            continue
+        file_id = entry.get("id")
+        if isinstance(file_id, str) and file_id:
+            lookup[file_id] = entry
+    return lookup
+
+
+def _select_link_entries(
+    project: Project, link_ids: Sequence[str] | None
+) -> list[dict[str, Any]]:
+    """Return the subset of link entries referenced by ``link_ids``."""
+
+    if link_ids:
+        selected: list[dict[str, Any]] = []
+        missing: list[str] = []
+        for link_id in link_ids:
+            entry = project.find_link_by_id(link_id)
+            if not isinstance(entry, dict):
+                missing.append(str(link_id))
+                continue
+            selected.append(entry)
+        if missing:
+            missing_list = ", ".join(missing)
+            raise ValueError(f"Unknown link id(s): {missing_list}.")
+        return selected
+
+    entries: list[dict[str, Any]] = []
+    for entry in project.links:
+        if isinstance(entry, dict):
+            entries.append(entry)
+    return entries
+
+
+def _format_reasons(reasons: Sequence[str]) -> str:
+    """Return a friendly representation of staleness ``reasons``."""
+
+    if not reasons:
+        return "-"
+    return "; ".join(reasons)
+
+
+def _resolve_target_path_entry(
+    target: Mapping[str, Any],
+    *,
+    file_lookup: Mapping[str, Mapping[str, Any]],
+    label: str,
+) -> Path:
+    """Resolve the filesystem path for ``target``."""
+
+    path_value = target.get("path")
+    if isinstance(path_value, str) and path_value:
+        return Path(path_value)
+
+    file_id = target.get("file_id")
+    if not isinstance(file_id, str) or not file_id:
+        raise ValueError(
+            f"{label.capitalize()} target must define 'file_id' or 'path'."
+        )
+
+    file_entry = file_lookup.get(file_id)
+    if not isinstance(file_entry, Mapping):
+        raise ValueError(
+            f"{label.capitalize()} target references unknown file id '{file_id}'."
+        )
+
+    entry_path = file_entry.get("path")
+    if not isinstance(entry_path, str) or not entry_path:
+        raise ValueError(f"File '{file_id}' does not define a usable path.")
+    return Path(entry_path)
+
+
+def _compute_entry_region_hash(
+    target: Mapping[str, Any],
+    *,
+    region_key: str,
+    file_lookup: Mapping[str, Mapping[str, Any]],
+    label: str,
+) -> RegionHash:
+    """Compute the region hash for a serialized target entry."""
+
+    try:
+        lines = _line_span_from_mapping(target.get("lines"))
+    except ValueError as exc:
+        raise ValueError(f"Invalid line range for {label}: {exc}") from exc
+
+    path = _resolve_target_path_entry(target, file_lookup=file_lookup, label=label)
+    digest = _normalize_hash_object(target.get(region_key))
+    if digest is None:
+        digest = _normalize_hash_object(target.get("region_hash"))
+    algo = digest[0] if digest is not None else None
+    start_line = lines.start if lines else None
+    end_line = lines.end if lines else None
+    try:
+        if algo:
+            return compute_region_hash(
+                path, start_line=start_line, end_line=end_line, algo=algo
+            )
+        return compute_region_hash(path, start_line=start_line, end_line=end_line)
+    except FileNotFoundError as exc:
+        raise ValueError(f"{label.capitalize()} file '{path}' does not exist.") from exc
+    except UnicodeDecodeError as exc:
+        raise ValueError(
+            f"{label.capitalize()} file '{path}' is not valid UTF-8."
+        ) from exc
+    except ValueError as exc:
+        raise ValueError(f"Invalid line range for {label}: {exc}") from exc
+
+
+def _update_target_region_hash(
+    target: dict[str, Any], *, region_key: str, region_hash: RegionHash
+) -> None:
+    """Persist ``region_hash`` back onto the serialized target mapping."""
+
+    target[region_key] = {"algo": region_hash.algo, "value": region_hash.value}
 
 
 def _generate_file_id(project: Project) -> str:
@@ -770,15 +890,132 @@ def _handle_list_links(args: Namespace) -> int:
 
 
 def _handle_check(args: Namespace) -> int:
-    """Placeholder handler for the ``check`` subcommand."""
+    """Run staleness detection for the selected links."""
 
-    return _unimplemented("check")
+    project_path = Path(args.project)
+    try:
+        project = load_project(project_path)
+    except ProjectIOError as exc:
+        _print_error(str(exc))
+        return 1
+
+    try:
+        link_entries = _select_link_entries(project, args.link_ids)
+    except ValueError as exc:
+        _print_error(str(exc))
+        return 1
+
+    file_lookup = _build_file_lookup(project)
+    annotated: list[tuple[dict[str, Any], LinkStalenessResult]] = []
+    for entry in link_entries:
+        try:
+            link = _link_from_mapping(entry)
+        except ValueError as exc:
+            identifier = entry.get("id") if isinstance(entry, Mapping) else None
+            label = f"link '{identifier}'" if identifier else "link"
+            _print_error(f"Invalid {label}: {exc}")
+            return 1
+        result = check_link_staleness(link, file_lookup=file_lookup)
+        annotated.append((entry, result))
+
+    stale_count = sum(1 for _entry, result in annotated if result.stale)
+
+    if args.json:
+        payload = {
+            "total": len(annotated),
+            "stale": stale_count,
+            "results": [
+                {
+                    "id": result.link_id,
+                    "type": str(entry.get("type", "")),
+                    "stale": result.stale,
+                    **(
+                        {"reason": _format_reasons(result.reasons)}
+                        if result.reasons
+                        else {}
+                    ),
+                }
+                for entry, result in annotated
+            ],
+        }
+        _print_json(payload)
+    else:
+        rows: list[list[str]] = []
+        for entry, result in annotated:
+            rows.append(
+                [
+                    str(entry.get("id", "")),
+                    str(entry.get("type", "")),
+                    "STALE" if result.stale else "OK",
+                    _format_reasons(result.reasons),
+                ]
+            )
+        _print_table(["ID", "TYPE", "STATUS", "DETAILS"], rows)
+        if not rows:
+            print("(no links)")
+
+    return 1 if stale_count else 0
 
 
 def _handle_recompute(args: Namespace) -> int:
-    """Placeholder handler for the ``recompute`` subcommand."""
+    """Update stored region hashes for the selected links."""
 
-    return _unimplemented("recompute")
+    project_path = Path(args.project)
+    try:
+        project = load_project(project_path)
+    except ProjectIOError as exc:
+        _print_error(str(exc))
+        return 1
+
+    try:
+        link_entries = _select_link_entries(project, args.link_ids)
+    except ValueError as exc:
+        _print_error(str(exc))
+        return 1
+
+    if not link_entries:
+        return 0
+
+    file_lookup = _build_file_lookup(project)
+    for entry in link_entries:
+        src_entry = entry.get("src")
+        dst_entry = entry.get("dst")
+        if not isinstance(src_entry, dict) or not isinstance(dst_entry, dict):
+            _print_error("Link entries must define 'src' and 'dst' targets.")
+            return 1
+        try:
+            src_hash = _compute_entry_region_hash(
+                src_entry,
+                region_key="src_region_hash",
+                file_lookup=file_lookup,
+                label="source",
+            )
+            dst_hash = _compute_entry_region_hash(
+                dst_entry,
+                region_key="dst_region_hash",
+                file_lookup=file_lookup,
+                label="destination",
+            )
+        except ValueError as exc:
+            identifier = entry.get("id")
+            prefix = f"Link '{identifier}' " if identifier else "Link "
+            _print_error(prefix + str(exc))
+            return 1
+
+        _update_target_region_hash(
+            src_entry, region_key="src_region_hash", region_hash=src_hash
+        )
+        _update_target_region_hash(
+            dst_entry, region_key="dst_region_hash", region_hash=dst_hash
+        )
+
+    try:
+        save_project(project_path, project)
+    except ProjectIOError as exc:
+        _print_error(str(exc))
+        return 1
+
+    return 0
 
 
 def _handle_validate(args: Namespace) -> int:

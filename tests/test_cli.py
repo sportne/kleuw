@@ -144,7 +144,7 @@ def _create_project_with_files(tmp_path: Path) -> tuple[Path, Path, Path]:
     return project_path, src_file, dst_file
 
 
-def _create_project_with_links(tmp_path: Path) -> Path:
+def _create_project_with_links(tmp_path: Path) -> tuple[Path, Path, Path]:
     project_path = tmp_path / "project.json"
     src_file = tmp_path / "src.txt"
     src_file.write_text("alpha\nbeta\n", encoding="utf-8")
@@ -195,7 +195,7 @@ def _create_project_with_links(tmp_path: Path) -> Path:
     save_project(project_path, project)
     # Modify the second line so only ``L2`` is stale.
     src_file.write_text("alpha\nchanged\n", encoding="utf-8")
-    return project_path
+    return project_path, src_file, dst_file
 
 
 def test_handle_add_file_adds_entry_with_generated_id(tmp_path: Path) -> None:
@@ -304,7 +304,7 @@ def test_handle_list_files_supports_table_and_json(tmp_path: Path, capsys) -> No
 
 
 def test_handle_list_links_prints_table(tmp_path: Path, capsys) -> None:
-    project_path = _create_project_with_links(tmp_path)
+    project_path, _src_file, _dst_file = _create_project_with_links(tmp_path)
 
     exit_code = cli._handle_list_links(
         Namespace(
@@ -322,7 +322,7 @@ def test_handle_list_links_prints_table(tmp_path: Path, capsys) -> None:
 
 
 def test_handle_list_links_supports_json_and_filters(tmp_path: Path, capsys) -> None:
-    project_path = _create_project_with_links(tmp_path)
+    project_path, _src_file, _dst_file = _create_project_with_links(tmp_path)
 
     exit_code = cli._handle_list_links(
         Namespace(
@@ -405,3 +405,63 @@ def test_handle_create_link_reports_missing_source(tmp_path: Path, capsys) -> No
 
     assert exit_code == 1
     assert "Source file" in capsys.readouterr().err
+
+
+def test_handle_check_reports_results_and_exit_codes(tmp_path: Path, capsys) -> None:
+    project_path, _src_file, _dst_file = _create_project_with_links(tmp_path)
+
+    exit_code = cli._handle_check(
+        Namespace(project=str(project_path), link_ids=None, json=False)
+    )
+
+    assert exit_code == 1
+    output = capsys.readouterr().out
+    assert "L1" in output and "L2" in output
+    assert "STALE" in output and "OK" in output
+
+
+def test_handle_check_supports_json_and_link_filter(tmp_path: Path, capsys) -> None:
+    project_path, _src_file, _dst_file = _create_project_with_links(tmp_path)
+
+    exit_code = cli._handle_check(
+        Namespace(project=str(project_path), link_ids=["L1"], json=True)
+    )
+
+    assert exit_code == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["total"] == 1
+    assert payload["stale"] == 0
+    assert payload["results"][0]["id"] == "L1"
+
+
+def test_handle_check_errors_on_unknown_link(tmp_path: Path, capsys) -> None:
+    project_path, _src_file, _dst_file = _create_project_with_links(tmp_path)
+
+    exit_code = cli._handle_check(
+        Namespace(project=str(project_path), link_ids=["missing"], json=False)
+    )
+
+    assert exit_code == 1
+    assert "Unknown link id" in capsys.readouterr().err
+
+
+def test_handle_recompute_updates_hashes(tmp_path: Path, capsys) -> None:
+    project_path, src_file, _dst_file = _create_project_with_links(tmp_path)
+
+    exit_code = cli._handle_recompute(
+        Namespace(project=str(project_path), link_ids=None)
+    )
+
+    assert exit_code == 0
+    project = load_project(project_path)
+    link_entry = project.find_link_by_id("L2")
+    assert link_entry is not None
+    expected_hash = compute_region_hash(src_file, start_line=2, end_line=2)
+    assert link_entry["src"]["src_region_hash"]["value"] == expected_hash.value
+
+    # Freshness check should now pass
+    exit_code = cli._handle_check(
+        Namespace(project=str(project_path), link_ids=None, json=False)
+    )
+    assert exit_code == 0
+    capsys.readouterr()  # Drain output
