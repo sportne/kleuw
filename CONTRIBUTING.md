@@ -156,6 +156,10 @@ Additionally:
 * Keep conceptual documentation in `spec/`
 * Keep user-focused documentation in `README.md`
 
+These specification files describe the **current implementation**, not just the
+intended design. Please keep them synchronized with any code changes so the CLI,
+GUI, and documentation remain aligned.
+
 ---
 
 # 8. Project Standards Summary

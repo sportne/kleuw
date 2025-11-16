@@ -330,7 +330,24 @@ Metadata is free-form and ignored by the core logic.
 
 ---
 
-## 13. Future Schema Extensions (Not in v1)
+## 13. Schema Validation Implementation
+
+`src/kleuw/schema.py` loads the authoritative JSON Schema from
+`spec/kleuw.schema.json` and enforces the structural rules described above. The
+module:
+
+* Rejects unknown top-level keys as well as extraneous fields inside file/link objects.
+* Verifies unique `id` values for both files and links.
+* Ensures `tags` are non-empty strings without whitespace, and that region-hash
+  objects contain `algo`/`value` pairs with ≥16 hexadecimal characters.
+* Enforces the mutually exclusive `file_id` vs `path` rule for targets while also
+  validating line spans.
+
+Both `load_project` and `save_project` call `validate_project` so that every IO
+operation performs round-trip validation. The CLI `validate` subcommand exposes
+the same checks directly to users.
+
+## 14. Future Schema Extensions (Not in v1)
 
 * Discontiguous line spans
 * Line-level text anchors based on regex signatures

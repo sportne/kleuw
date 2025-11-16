@@ -81,9 +81,9 @@ Adds a file entry to the project.
 
 **Behavior:**
 
-* If `--id` omitted, Kleuw generates one.
-* Validates file exists.
-* Optionally computes file-level hash if `--hash` provided.
+* If `--id` is omitted, Kleuw generates the next available `file-<n>` identifier.
+* The CLI verifies that the path exists and is a regular file before writing the entry.
+* `--hash` computes a `sha256` digest and stores it under the `hash` field.
 
 **Options:**
 
@@ -98,7 +98,15 @@ Adds a file entry to the project.
 kleuw list-files <project.json>
 ```
 
-Prints the list of files in table format.
+Prints the list of files in table format with columns `ID`, `PATH`, `LANG`, `HASH`, and `NOTE`.
+
+`--json` outputs a payload of the form:
+
+```json
+{
+  "files": [ { ... }, ... ]
+}
+```
 
 **Options:**
 
@@ -125,8 +133,9 @@ Creates a new link between two targets.
   * `src/app.py:45-60`
   * `src/app.py:120`
 * Computes region hashes for the link.
-* Generates unique link ID.
-* Appends new link to project.
+* Resolves `file_id` references when the path matches a recorded file; otherwise stores the path directly.
+* Generates the next available `link-<n>` ID and appends the link to the project.
+* Trims comma-separated tags supplied via `--tags`; blank values raise an error.
 
 **Options:**
 
@@ -146,7 +155,8 @@ Creates a new link between two targets.
 kleuw list-links <project.json> [--stale-only] [--type RELTYPE]
 ```
 
-Lists all or filtered links.
+Lists all or filtered links. The command recomputes staleness only when
+`--stale-only` is provided; JSON output always mirrors the stored link entries.
 
 **Options:**
 
@@ -167,7 +177,7 @@ Checks for stale relationships.
 **Behavior:**
 
 * Recomputes region hashes for selected links or all links.
-* Prints tabular diagnostics.
+* Prints tabular diagnostics with columns `ID`, `TYPE`, `STATUS`, `DETAILS`.
 * Returns exit code:
 
   * **0** if no stale links
@@ -175,14 +185,28 @@ Checks for stale relationships.
 
 **Options:**
 
+* `--link-id LID...` — restrict evaluation to a subset of links (errors if an ID is unknown)
 * `--json` — output structured results
 
 **Example Output:**
 
 ```
 ID    TYPE       STATUS   DETAILS
-L12   implements STALE    src changed
-L13   tests      OK       
+L12   implements STALE    src region changed
+L13   tests      OK       -
+```
+
+**Example JSON:**
+
+```json
+{
+  "total": 2,
+  "stale": 1,
+  "results": [
+    { "id": "L12", "type": "implements", "stale": true,  "reason": "src region changed" },
+    { "id": "L13", "type": "tests", "stale": false }
+  ]
+}
 ```
 
 ---
@@ -195,6 +219,12 @@ kleuw recompute <project.json> [--link-id LID...]
 
 Updates stored region hashes to current file state.
 
+**Behavior:**
+
+* Validates the project file before recomputing.
+* Requires access to the original source files so hashes can be refreshed.
+* Writes the updated hashes back to disk; there is no `--json` mode for this command.
+
 **Use Case:** Accepting updated content as the new baseline.
 
 ---
@@ -205,16 +235,13 @@ Updates stored region hashes to current file state.
 kleuw validate <project.json>
 ```
 
-Checks:
+Validates the project against `spec/kleuw.schema.json`.
 
-* Structural schema conformity
-* File references
-* Line range validity
+**Checks:** Structural schema conformity, `file_id` references, line span shape, and hash encoding rules.
 
-Exit codes:
+**Output:** Prints a summary such as `Project is valid (3 files, 12 links).` when no errors are found. Validation errors are listed on stderr.
 
-* **0** valid
-* **1** invalid
+Exit codes: **0** when valid, **1** otherwise.
 
 ---
 
@@ -226,21 +253,23 @@ kleuw export <project.json> --format {json,csv,txt}
 
 Exports:
 
-* file list
-* link list
-* staleness report (optional flag)
+* File list plus link list annotated with staleness results
+* Project summary counts (`total`, `stale`, `exported`)
 
-**Options:**
+**Formats:**
 
-* `--format` — output style
-* `--stale` — export only stale links
+* `json` — includes `files`, `links` (with `stale`/`stale_reasons` fields), and a summary block
+* `csv` — writes rows with a `section` column (either `file` or `link`) so downstream tooling can split data
+* `txt` — renders the same tables used by `list-files`/`check` followed by totals
+
+`--stale` filters the exported links (and summary) to stale entries only.
 
 ---
 
 ## 5. CLI Pattern Rules
 
 * All commands accept `--json` for machine-readable output when applicable.
-* Flags should have both long (`--type`) and short (`-t`) versions when possible.
+* Flags currently use descriptive long forms (`--type`, `--json`, etc.); short aliases may be added later.
 * Errors print to STDERR and return non-zero exit codes.
 * Commands should never modify project files unless explicitly instructed (`create-link`, `add-file`, `recompute`).
 
@@ -279,7 +308,11 @@ Used for:
 * `check --json`
 * `export --format json`
 
-JSON keys shall match the Kleuw schema’s property names.
+JSON keys shall match the Kleuw schema’s property names. Notable payload shapes:
+
+* `list-links --json` returns the stored link entries (no derived staleness fields) even when `--stale-only` filters the data.
+* `check --json` emits `{ "total": ..., "stale": ..., "results": [ {"id", "type", "stale", "reason"? }, ... ] }`.
+* `export --format json` includes `files`, `links` (with `stale`/`stale_reasons`), and a `summary` block.
 
 ---
 

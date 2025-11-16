@@ -109,9 +109,31 @@ If none of these conditions are true, the link is **fresh**.
 The staleness system supports:
 
 * GUI indicators (highlighted rows, status bar summaries)
-* CLI command `kleuw check`
+* CLI commands `kleuw check`, `kleuw list-links --stale-only`, and `kleuw export --stale`
 * Human-readable output
 * JSON output (`--json`)
+
+### 6.2 Result Objects & Reasons
+
+`staleness.check_link_staleness` returns a `LinkStalenessResult` containing:
+
+* `stale` – boolean flag
+* `reasons` – tuple of human-readable reason strings (prefixed with `src`/`dst`)
+* `src`/`dst` – per-target results with `stale`, `reason`, and the recomputed hash
+
+The implementation emits consistent reason labels so downstream tooling can
+surface friendly messages:
+
+| Reason Text           | Meaning                                     |
+| --------------------- | ------------------------------------------- |
+| `file missing`        | File could not be opened                     |
+| `decode error`        | UTF-8 decoding failed                        |
+| `invalid line range`  | Stored span is outside the file              |
+| `region hash missing` | Link target lacks a stored hash              |
+| `region changed`      | Recomputed hash differs from the stored hash |
+
+CLI commands reuse these strings directly (e.g., the `reason` field in
+`kleuw check --json`), ensuring GUI and CLI presentations stay in sync.
 
 ---
 
@@ -120,7 +142,8 @@ The staleness system supports:
 ### 7.1 Recompute Hashes
 
 * User may explicitly recompute stored region hashes.
-* Overwrites old hashes and sets new staleness baseline.
+* Overwrites old hashes and sets new staleness baseline. The CLI exposes this via
+  `kleuw recompute`; the GUI currently defers to the CLI for this workflow.
 
 ### 7.2 Editing Line Ranges
 

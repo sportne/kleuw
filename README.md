@@ -69,23 +69,38 @@ Detailed CLI and GUI specifications live in the `spec/` directory.
 
 ## CLI
 
-The CLI will support:
+Kleuw ships with a fully functional CLI entry point named `kleuw`. The
+implemented subcommands mirror `src/kleuw/cli.py`:
 
-* Initializing a project
-* Adding and listing files
-* Creating links between files and line ranges
-* Detecting stale relationships
+* `init` – create a new JSON project file (`--force` overwrites)
+* `add-file` – register a file path and optionally compute its hash
+* `list-files` – display tracked files in a table or via `--json`
+* `create-link` – create a link by passing `--src`, `--dst`, `--type`, `--note`, and `--tags`
+* `list-links` – list links, with `--json`, `--stale-only`, and `--type` filters
+* `check` – recompute region hashes, flag stale links, and set exit codes accordingly
+* `recompute` – persist freshly computed region hashes for the selected links
+* `validate` – validate a project against `spec/kleuw.schema.json`
+* `export` – emit JSON/CSV/text summaries (and optionally `--stale`-only data)
+
+Reporting commands accept `--json` where applicable so that automation can
+consume the exact structures defined by the Kleuw schema.
 
 Design: **spec/kleuw_cli.md**
 
 ## GUI
 
-The GUI provides an interface for:
+The Tkinter GUI focuses on visualizing files, selecting regions, creating or
+editing links, and reviewing staleness. Implemented behaviors include:
 
-* Side‑by‑side file viewing
-* Line‑range selection
-* Choosing a typed relationship
-* Reviewing and editing existing links
+* Loading arbitrary text files into independent left/right viewers from the Files panel
+* Line-locked selections with synchronized status-bar summaries
+* Manual relationship creation once both viewers contain files and a relationship type
+* Editing and deleting existing links plus double-click navigation that loads the linked regions
+* Running a project-wide staleness check (with highlighting and filtering) using the same logic as the CLI
+
+Menu and toolbar entries other than “Create Link” and “Check Staleness” currently
+display placeholder dialogs; persistence is handled through the CLI or external
+tooling.
 
 Design: **spec/kleuw_ui.md**
 

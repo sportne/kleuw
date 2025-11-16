@@ -25,14 +25,16 @@ The tool is intended as a foundation for future digital thread tooling.
 * **FR-1:** Kleuw shall load and save a project JSON file that adheres to the Kleuw schema.
 * **FR-2:** Kleuw shall support creating new empty project files.
 * **FR-3:** Kleuw shall validate project files against baseline structural requirements.
-* **FR-4:** Kleuw shall track unsaved changes and warn the user when closing with unsaved modifications.
+* **FR-4:** The GUI shall track unsaved changes via a dirty indicator; persistence and close warnings are handled externally through the CLI or embedding application.
 
 ### 3.2 File Catalog
 
 * **FR-5:** Users shall be able to add file paths to the project.
-* **FR-6:** Kleuw shall compute and store optional file-level hashes.
-* **FR-7:** Kleuw shall allow referencing a file by path or by a stable file identifier.
-* **FR-8:** If a file is missing, Kleuw shall report the corresponding links as stale.
+* **FR-6:** `kleuw add-file` shall verify that the referenced path exists and can optionally store a `sha256` hash when `--hash` is supplied.
+* **FR-7:** Kleuw shall allow referencing a file by path or by a stable file identifier, automatically preferring `file_id` when a project entry matches the on-disk path.
+* **FR-8:** If a file is missing or cannot be decoded, Kleuw shall report the corresponding links as stale.
+
+Implementation note: The GUI's Files panel maintains its own ad-hoc list solely for opening files inside the viewers; callers must use the CLI or project helpers to persist file entries.
 
 ### 3.3 Relationship Creation
 
@@ -48,7 +50,7 @@ The tool is intended as a foundation for future digital thread tooling.
 * **FR-15:** The GUI shall display all links in a tabular list.
 * **FR-16:** Selecting a link shall open its associated files and scroll to the appropriate region.
 * **FR-17:** Users shall be able to edit link metadata (relationship type, notes, tags).
-* **FR-18:** Users shall be able to recompute and overwrite region hashes.
+* **FR-18:** Users shall be able to recompute and overwrite region hashes via the CLI `recompute` command; the GUI exposes placeholders for this action but currently defers to the CLI.
 * **FR-19:** Users shall be able to delete links.
 
 ### 3.5 Staleness Detection
@@ -60,11 +62,14 @@ The tool is intended as a foundation for future digital thread tooling.
 
 ### 3.6 CLI Requirements
 
-* **FR-24:** Kleuw shall provide an `init` command for creating new project files.
-* **FR-25:** Kleuw shall provide a `add-file` command for registering files.
-* **FR-26:** Kleuw shall allow creating links via command-line parameters.
-* **FR-27:** The CLI shall support staleness checking and printing results.
-* **FR-28:** The CLI shall support exporting summaries in text or JSON.
+* **FR-24:** `kleuw init` shall create a new Kleuw project (and support `--force` when overwriting an existing file).
+* **FR-25:** `kleuw add-file` shall register on-disk files, generate default `file-<n>` identifiers, and optionally compute hashes via `--hash`.
+* **FR-26:** `kleuw list-files` and `kleuw list-links` shall render tabular output and, when `--json` is supplied, emit machine-readable payloads matching the schema.
+* **FR-27:** `kleuw create-link` shall parse CLI region syntax, compute region hashes, attach `file_id` references when possible, and assign deterministic `link-<n>` identifiers.
+* **FR-28:** `kleuw check` shall recompute region hashes for the selected links, surface human-readable and JSON diagnostics, and return exit code `1` whenever any link is stale. `list-links --stale-only` uses the same staleness evaluation pipeline.
+* **FR-29:** `kleuw recompute` shall overwrite stored region hashes for the selected links after validating the project file.
+* **FR-30:** `kleuw validate` shall read a project JSON file and report schema violations using `spec/kleuw.schema.json`.
+* **FR-31:** `kleuw export` shall export files and annotated link staleness information in `json`, `csv`, or `txt` formats, each supporting the `--stale` filter.
 
 ## 4. Non-Functional Requirements (NFRs)
 
@@ -83,7 +88,7 @@ The tool is intended as a foundation for future digital thread tooling.
 
 * **NFR-6:** All file operations shall handle missing files gracefully.
 * **NFR-7:** JSON read/write operations must avoid data loss and preserve deterministic ordering.
-* **NFR-8:** Undo/redo stack shall support at least 20 actions.
+* **NFR-8:** Undo/redo functionality is deferred; the current GUI surfaces state changes via the dirty indicator instead of maintaining an action stack.
 
 ### 4.4 Portability
 
@@ -115,6 +120,7 @@ The tool is intended as a foundation for future digital thread tooling.
 * Plugin architecture
 * Watch mode (real-time staleness detection)
 * Syntax highlighting
+* Undo/redo stack and project persistence directly from the GUI
 
 ---
 

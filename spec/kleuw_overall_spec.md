@@ -14,6 +14,25 @@ The Kleuw specification is organized into several sub-documents, each covering o
 
 Each sub-document links back to this overview.
 
+## Implementation Snapshot
+
+The initial implementation adheres to the following structure:
+
+* **CLI (`src/kleuw/cli.py`)** – Provides `init`, `add-file`, `list-files`, `create-link`,
+  `list-links`, `check`, `recompute`, `validate`, and `export` commands. The CLI is the
+  entry point for persistence and for schema validation (`spec/kleuw.schema.json`).
+* **GUI (`src/kleuw/gui.py`)** – Presents a Tkinter application centered on the link
+  workspace. It loads text files into left/right viewers, allows full-line selections,
+  creates or edits links within an in-memory `Project`, and performs staleness checks by
+  calling the same core logic as the CLI.
+* **Shared core modules** – `model.py`, `project.py`, `hashing.py`, `staleness.py`, and
+  `io.py` implement the schema-defined data structures, region hashing, validation, and
+  JSON IO routines used by both front ends.
+
+All behavioral specifics referenced by the code live in the subordinate spec documents
+listed above; this file simply ties them together and documents the state of the shipped
+implementation.
+
 ## Purpose
 
 The purpose of this documentation set is to guide the future implementation of Kleuw in a stable, structured, and version-controlled manner.
