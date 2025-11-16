@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import csv
 import json
 from argparse import Namespace
 from collections.abc import Sequence
+from io import StringIO
 from pathlib import Path
 
 import pytest
@@ -465,3 +467,71 @@ def test_handle_recompute_updates_hashes(tmp_path: Path, capsys) -> None:
     )
     assert exit_code == 0
     capsys.readouterr()  # Drain output
+
+
+def test_handle_validate_reports_success(tmp_path: Path, capsys) -> None:
+    project_path = tmp_path / "project.json"
+    _create_project(project_path)
+
+    exit_code = cli._handle_validate(Namespace(project=str(project_path)))
+
+    assert exit_code == 0
+    assert "Project is valid" in capsys.readouterr().out
+
+
+def test_handle_validate_reports_schema_errors(tmp_path: Path, capsys) -> None:
+    project_path = tmp_path / "project.json"
+    project_path.write_text("{}", encoding="utf-8")
+
+    exit_code = cli._handle_validate(Namespace(project=str(project_path)))
+
+    assert exit_code == 1
+    error_output = capsys.readouterr().err
+    assert "Project validation failed" in error_output
+    assert "Missing required field 'version'" in error_output
+
+
+def test_handle_export_supports_json_and_stale_filter(tmp_path: Path, capsys) -> None:
+    project_path, _src_file, _dst_file = _create_project_with_links(tmp_path)
+
+    exit_code = cli._handle_export(
+        Namespace(project=str(project_path), format="json", stale=False)
+    )
+
+    assert exit_code == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["summary"]["files"] == 2
+    assert payload["summary"]["links"] == 2
+    assert payload["summary"]["stale_links"] == 1
+    assert {link["id"] for link in payload["links"]} == {"L1", "L2"}
+
+    exit_code = cli._handle_export(
+        Namespace(project=str(project_path), format="json", stale=True)
+    )
+
+    assert exit_code == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["summary"]["exported_links"] == 1
+    assert [link["id"] for link in payload["links"]] == ["L2"]
+
+
+def test_handle_export_supports_csv_and_text(tmp_path: Path, capsys) -> None:
+    project_path, _src_file, _dst_file = _create_project_with_links(tmp_path)
+
+    exit_code = cli._handle_export(
+        Namespace(project=str(project_path), format="csv", stale=False)
+    )
+
+    assert exit_code == 0
+    rows = list(csv.DictReader(StringIO(capsys.readouterr().out)))
+    assert any(row["section"] == "file" for row in rows)
+    assert any(row["section"] == "link" for row in rows)
+
+    exit_code = cli._handle_export(
+        Namespace(project=str(project_path), format="txt", stale=True)
+    )
+
+    assert exit_code == 0
+    output = capsys.readouterr().out
+    assert "Files:" in output and "Links:" in output
+    assert "Exported links: 1 (stale only)" in output
