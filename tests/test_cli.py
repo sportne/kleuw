@@ -130,6 +130,20 @@ def _create_project(path: Path) -> None:
     save_project(path, Project())
 
 
+def _create_project_with_files(tmp_path: Path) -> tuple[Path, Path, Path]:
+    project_path = tmp_path / "project.json"
+    src_file = tmp_path / "src.txt"
+    src_file.write_text("alpha\nbeta\n", encoding="utf-8")
+    dst_file = tmp_path / "dst.txt"
+    dst_file.write_text("one\ntwo\n", encoding="utf-8")
+
+    project = Project()
+    project.add_file(FileEntry(id="SRC", path=str(src_file)))
+    project.add_file(FileEntry(id="DST", path=str(dst_file)))
+    save_project(project_path, project)
+    return project_path, src_file, dst_file
+
+
 def _create_project_with_links(tmp_path: Path) -> Path:
     project_path = tmp_path / "project.json"
     src_file = tmp_path / "src.txt"
@@ -322,3 +336,72 @@ def test_handle_list_links_supports_json_and_filters(tmp_path: Path, capsys) -> 
     assert exit_code == 0
     payload = json.loads(capsys.readouterr().out)
     assert [link["id"] for link in payload["links"]] == ["L2"]
+
+
+def test_handle_create_link_adds_entry_and_prints_id(tmp_path: Path, capsys) -> None:
+    project_path, src_file, dst_file = _create_project_with_files(tmp_path)
+
+    exit_code = cli._handle_create_link(
+        Namespace(
+            project=str(project_path),
+            src=f"{src_file}:1-2",
+            dst=f"{dst_file}:1",
+            type=LinkType.IMPLEMENTS.value,
+            note="trace note",
+            tags="reqs,tests",
+        )
+    )
+
+    assert exit_code == 0
+    output = capsys.readouterr().out.strip()
+    assert output == "link-1"
+
+    project = load_project(project_path)
+    link_entry = project.find_link_by_id("link-1")
+    assert link_entry is not None
+    assert link_entry["src"]["file_id"] == "SRC"
+    assert link_entry["dst"]["file_id"] == "DST"
+    assert link_entry["note"] == "trace note"
+    assert link_entry["tags"] == ["reqs", "tests"]
+
+    expected_src_hash = compute_region_hash(src_file, start_line=1, end_line=2)
+    expected_dst_hash = compute_region_hash(dst_file, start_line=1, end_line=1)
+    assert link_entry["src"]["src_region_hash"]["value"] == expected_src_hash.value
+    assert link_entry["dst"]["dst_region_hash"]["value"] == expected_dst_hash.value
+
+
+def test_handle_create_link_rejects_unknown_type(tmp_path: Path, capsys) -> None:
+    project_path, src_file, dst_file = _create_project_with_files(tmp_path)
+
+    exit_code = cli._handle_create_link(
+        Namespace(
+            project=str(project_path),
+            src=str(src_file),
+            dst=str(dst_file),
+            type="unknown",
+            note=None,
+            tags=None,
+        )
+    )
+
+    assert exit_code == 1
+    assert "Unknown link type" in capsys.readouterr().err
+
+
+def test_handle_create_link_reports_missing_source(tmp_path: Path, capsys) -> None:
+    project_path, _src_file, dst_file = _create_project_with_files(tmp_path)
+    missing_source = tmp_path / "missing.txt"
+
+    exit_code = cli._handle_create_link(
+        Namespace(
+            project=str(project_path),
+            src=str(missing_source),
+            dst=f"{dst_file}:1",
+            type=LinkType.IMPLEMENTS.value,
+            note=None,
+            tags=None,
+        )
+    )
+
+    assert exit_code == 1
+    assert "Source file" in capsys.readouterr().err
