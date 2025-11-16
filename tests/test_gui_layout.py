@@ -79,8 +79,9 @@ def test_gui_builds_layout_with_stubs(
     )
 
     assert "menu" in root.config_kwargs
+    initial_summary = gui.selection_var.get()
     gui._placeholder_action("Headless Test")
-    assert gui.selection_var.get() == "Action requested: Headless Test"
+    assert gui.selection_var.get() == initial_summary
     assert stub_messagebox.info_calls[-1] == (
         "Kleuw",
         "Headless Test is not implemented yet.",

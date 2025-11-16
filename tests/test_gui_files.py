@@ -10,6 +10,8 @@ from typing import Any
 import pytest
 
 from kleuw.gui import KleuwGUI
+from kleuw.model import LinkType
+from kleuw.project import Project
 from tests._gui_stubs import StubMessageBox, StubRoot, StubStringVar
 
 
@@ -83,6 +85,8 @@ class _FakeText(_BaseWidget):
         self.width = 0
         self.yscrollcommand: Callable[..., Any] | None = None
         self.xscrollcommand: Callable[..., Any] | None = None
+        self.tags: dict[str, dict[str, Any]] = {}
+        self.tag_ranges: dict[str, list[tuple[str, str]]] = {}
 
     def configure(self, **kwargs: Any) -> None:
         if "state" in kwargs:
@@ -124,6 +128,18 @@ class _FakeText(_BaseWidget):
 
     def see(self, *_args: Any, **_kwargs: Any) -> None:
         return None
+
+    def tag_configure(self, name: str, **kwargs: Any) -> None:
+        self.tags[name] = kwargs
+
+    def tag_remove(self, name: str, *_args: Any, **_kwargs: Any) -> None:
+        self.tag_ranges[name] = []
+
+    def tag_add(self, name: str, start: str, end: str) -> None:
+        self.tag_ranges.setdefault(name, []).append((start, end))
+
+    def index(self, _spec: str) -> str:
+        return "1.0"
 
 
 class _FakeScrollbar(_BaseWidget):
@@ -174,6 +190,13 @@ class _FakeButton(_BaseWidget):
     ) -> None:
         super().__init__()
         self.command = command
+        self.state = "normal"
+
+    def configure(self, **kwargs: Any) -> None:
+        if "state" in kwargs:
+            self.state = kwargs["state"]
+
+    config = configure
 
     def invoke(self) -> None:
         if self.command is not None:
@@ -300,6 +323,8 @@ def _make_gui(
     ttk_module: SimpleNamespace,
     messagebox: StubMessageBox,
     filedialog_module: SimpleNamespace,
+    *,
+    project: Project | None = None,
 ) -> KleuwGUI:
     return KleuwGUI(
         root=stub_root,
@@ -308,6 +333,7 @@ def _make_gui(
         messagebox_module=messagebox,
         enable_tooltips=False,
         filedialog_module=filedialog_module,
+        project=project,
     )
 
 
@@ -398,3 +424,134 @@ def test_missing_file_reports_error(
     gui._open_selection_in_viewer("right")
 
     assert stub_messagebox.error_calls[-1][1].startswith("Could not open")
+
+
+def test_selection_summary_updates_with_line_selection(
+    tmp_path: Path,
+    functional_tk_module: SimpleNamespace,
+    functional_ttk_module: SimpleNamespace,
+    stub_messagebox: StubMessageBox,
+) -> None:
+    left_file = tmp_path / "left.txt"
+    left_file.write_text("one\ntwo\nthree\n")
+    filedialog = SimpleNamespace(askopenfilenames=lambda **_: ())
+    gui = _make_gui(
+        StubRoot(),
+        functional_tk_module,
+        functional_ttk_module,
+        stub_messagebox,
+        filedialog,
+    )
+    assert gui._left_viewer is not None
+    gui._load_file_into_viewer(gui._left_viewer, str(left_file))
+    gui._set_viewer_selection(gui._left_viewer, 2, 3)
+    assert gui.selection_var.get().startswith("Selections: Left L2–L3")
+
+
+def test_swap_viewers_exchanges_files_and_selections(
+    tmp_path: Path,
+    functional_tk_module: SimpleNamespace,
+    functional_ttk_module: SimpleNamespace,
+    stub_messagebox: StubMessageBox,
+) -> None:
+    left_file = tmp_path / "left.txt"
+    right_file = tmp_path / "right.txt"
+    left_file.write_text("alpha\nbeta")
+    right_file.write_text("one\ntwo\nthree")
+    filedialog = SimpleNamespace(askopenfilenames=lambda **_: ())
+    gui = _make_gui(
+        StubRoot(),
+        functional_tk_module,
+        functional_ttk_module,
+        stub_messagebox,
+        filedialog,
+    )
+    assert gui._left_viewer is not None
+    assert gui._right_viewer is not None
+    gui._load_file_into_viewer(gui._left_viewer, str(left_file))
+    gui._load_file_into_viewer(gui._right_viewer, str(right_file))
+    gui._set_viewer_selection(gui._left_viewer, 1, 2)
+    gui._set_viewer_selection(gui._right_viewer, 3, 3)
+
+    gui._swap_viewer_files()
+
+    assert gui._left_viewer.file_path == str(right_file)
+    assert gui._right_viewer.file_path == str(left_file)
+    assert gui.selection_var.get().startswith("Selections: Left L3")
+
+
+def test_create_link_button_enables_after_requirements_met(
+    tmp_path: Path,
+    functional_tk_module: SimpleNamespace,
+    functional_ttk_module: SimpleNamespace,
+    stub_messagebox: StubMessageBox,
+) -> None:
+    left_file = tmp_path / "left.txt"
+    right_file = tmp_path / "right.txt"
+    left_file.write_text("alpha")
+    right_file.write_text("bravo")
+    filedialog = SimpleNamespace(askopenfilenames=lambda **_: ())
+    gui = _make_gui(
+        StubRoot(),
+        functional_tk_module,
+        functional_ttk_module,
+        stub_messagebox,
+        filedialog,
+    )
+    assert gui._create_link_button is not None
+    assert gui._create_link_button.state == "disabled"
+    assert gui._left_viewer is not None
+    assert gui._right_viewer is not None
+    gui._load_file_into_viewer(gui._left_viewer, str(left_file))
+    gui._load_file_into_viewer(gui._right_viewer, str(right_file))
+    gui._update_create_button_state()
+    assert gui._create_link_button.state == "disabled"
+    gui.relationship_var.set(LinkType.IMPLEMENTS.value)
+    gui._update_create_button_state()
+    assert gui._create_link_button.state == "normal"
+
+
+def test_create_link_uses_project_and_hashes(
+    tmp_path: Path,
+    functional_tk_module: SimpleNamespace,
+    functional_ttk_module: SimpleNamespace,
+    stub_messagebox: StubMessageBox,
+) -> None:
+    left_file = tmp_path / "left.txt"
+    right_file = tmp_path / "right.txt"
+    left_file.write_text("left-one\nleft-two")
+    right_file.write_text("right-one")
+    project = Project(
+        files=[
+            {"id": "src", "path": str(left_file)},
+            {"id": "dst", "path": str(right_file)},
+        ]
+    )
+    filedialog = SimpleNamespace(askopenfilenames=lambda **_: ())
+    gui = _make_gui(
+        StubRoot(),
+        functional_tk_module,
+        functional_ttk_module,
+        stub_messagebox,
+        filedialog,
+        project=project,
+    )
+    assert gui._left_viewer is not None
+    assert gui._right_viewer is not None
+    gui._load_file_into_viewer(gui._left_viewer, str(left_file))
+    gui._load_file_into_viewer(gui._right_viewer, str(right_file))
+    gui._set_viewer_selection(gui._left_viewer, 1, 1)
+    gui.relationship_var.set(LinkType.IMPLEMENTS.value)
+    gui._update_create_button_state()
+
+    gui._create_link()
+
+    assert len(project.links) == 1
+    entry = project.links[0]
+    assert entry["type"] == LinkType.IMPLEMENTS.value
+    assert entry["src"]["file_id"] == "src"
+    assert entry["src"]["lines"]["start"] == 1
+    assert entry["src"]["lines"]["end"] == 1
+    assert "src_region_hash" in entry["src"]
+    assert entry["dst"]["file_id"] == "dst"
+    assert "lines" not in entry["dst"]

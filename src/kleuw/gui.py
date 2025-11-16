@@ -15,7 +15,9 @@ from pathlib import Path
 from tkinter import filedialog, messagebox, ttk
 from typing import Any
 
-from kleuw.model import LinkType
+from kleuw.hashing import compute_region_hash
+from kleuw.model import LineSpan, Link, LinkType, RegionHash, Target
+from kleuw.project import Project
 
 __all__ = ["KleuwGUI", "launch"]
 
@@ -48,6 +50,12 @@ class ViewerPane:
     x_scroll: Any
     file_path: str | None = None
     line_count: int = 0
+    selection_start: int | None = None
+    selection_end: int | None = None
+    selection_anchor: int | None = None
+
+
+LINE_SELECTION_TAG = "line-selection"
 
 
 MENU_DEFINITION: tuple[tuple[str, Sequence[MenuItem]], ...] = (
@@ -183,6 +191,7 @@ class KleuwGUI:
         messagebox_module: Any = messagebox,
         filedialog_module: Any | None = None,
         enable_tooltips: bool = True,
+        project: Project | None = None,
     ) -> None:
         self._tk = tk_module
         self._ttk = ttk_module
@@ -191,6 +200,7 @@ class KleuwGUI:
             filedialog_module if filedialog_module is not None else filedialog
         )
         self._tooltips_enabled = enable_tooltips
+        self._project = project if project is not None else Project()
         self.root = root if root is not None else self._tk.Tk(className="kleuw")
         self.root.title("Kleuw")
         self.root.geometry("1200x800")
@@ -204,6 +214,8 @@ class KleuwGUI:
         self._file_listbox: Any | None = None
         self._left_viewer: ViewerPane | None = None
         self._right_viewer: ViewerPane | None = None
+        self.relationship_var = self._tk.StringVar(value="")
+        self._create_link_button: Any | None = None
 
         style = self._ttk.Style()
         style.configure("Tooltip.TLabel", background="#ffffe0")
@@ -213,6 +225,7 @@ class KleuwGUI:
         self._build_layout()
         self._build_status_bar()
         self._bind_shortcuts()
+        self._update_selection_summary()
 
     def _build_menu_bar(self) -> None:
         menu_bar = self._tk.Menu(self.root)
@@ -310,33 +323,37 @@ class KleuwGUI:
         controls = self._ttk.Frame(parent, padding=(0, 8, 0, 0))
         controls.pack(fill=self._tk.X)
         self._ttk.Label(controls, text="Relationship Type:").pack(side=self._tk.LEFT)
-        relationship_var = self._tk.StringVar(value="")
         relationship_combo = self._ttk.Combobox(
             controls,
-            textvariable=relationship_var,
+            textvariable=self.relationship_var,
             values=self._relationship_values,
             state="readonly",
             width=20,
         )
         relationship_combo.pack(side=self._tk.LEFT, padx=8)
+        relationship_combo.bind(
+            "<<ComboboxSelected>>",
+            lambda _event: self._update_create_button_state(),
+        )
         swap_btn = self._ttk.Button(
             controls,
             text="↔",
             width=3,
-            command=partial(self._placeholder_action, "Swap viewers"),
+            command=self._swap_viewer_files,
         )
         swap_btn.pack(side=self._tk.LEFT, padx=4)
-        create_btn = self._ttk.Button(
+        self._create_link_button = self._ttk.Button(
             controls,
             text="Create Link",
-            command=partial(self._placeholder_action, "Create Link"),
+            command=self._create_link,
         )
-        create_btn.pack(side=self._tk.LEFT, padx=4)
+        self._create_link_button.pack(side=self._tk.LEFT, padx=4)
         self._ttk.Label(
             controls,
             textvariable=self.selection_var,
             foreground="#555555",
         ).pack(side=self._tk.RIGHT)
+        self._update_create_button_state()
 
     def _build_viewer(self, parent: Any, label: str) -> ViewerPane:
         frame = self._ttk.Frame(parent)
@@ -362,10 +379,10 @@ class KleuwGUI:
             body,
             wrap=self._tk.NONE,
             height=20,
-            state=self._tk.DISABLED,
             font="TkFixedFont",
         )
         text.pack(fill=self._tk.BOTH, expand=True, side=self._tk.LEFT)
+        self._make_text_readonly(text)
         y_scroll = self._ttk.Scrollbar(body, orient=self._tk.VERTICAL)
         y_scroll.pack(side=self._tk.RIGHT, fill=self._tk.Y)
         x_scroll = self._ttk.Scrollbar(body, orient=self._tk.HORIZONTAL)
@@ -384,7 +401,7 @@ class KleuwGUI:
         text.configure(yscrollcommand=_on_text_scroll, xscrollcommand=x_scroll.set)
         line_numbers.configure(yscrollcommand=y_scroll.set)
         x_scroll.configure(command=text.xview)
-        return ViewerPane(
+        pane = ViewerPane(
             label_prefix=label,
             label_var=label_var,
             text_widget=text,
@@ -392,6 +409,20 @@ class KleuwGUI:
             y_scroll=y_scroll,
             x_scroll=x_scroll,
         )
+        text.tag_configure(LINE_SELECTION_TAG, background="#cfe8ff")
+        text.bind(
+            "<Button-1>",
+            lambda event, pane=pane: self._handle_selection_start(pane, event),
+        )
+        text.bind(
+            "<B1-Motion>",
+            lambda event, pane=pane: self._handle_selection_drag(pane, event),
+        )
+        text.bind(
+            "<ButtonRelease-1>",
+            lambda event, pane=pane: self._handle_selection_end(pane, event),
+        )
+        return pane
 
     def _build_links_panel(self, parent: Any) -> None:
         self._ttk.Label(parent, text="Links", font=("TkDefaultFont", 10, "bold")).pack(
@@ -441,20 +472,143 @@ class KleuwGUI:
     def _relationship_values(self) -> tuple[str, ...]:
         return tuple(link_type.value for link_type in LinkType)
 
+    # ------------------------------------------------------------------
+    # Viewer interaction helpers
+    # ------------------------------------------------------------------
+    def _make_text_readonly(self, widget: Any) -> None:
+        widget.bind("<Key>", lambda _event: "break")
+        widget.bind("<<Paste>>", lambda _event: "break")
+        widget.bind("<<Cut>>", lambda _event: "break")
+        widget.bind("<<Clear>>", lambda _event: "break")
+
+    def _handle_selection_start(self, viewer: ViewerPane, event: Any) -> str:
+        line = self._line_from_event(viewer, event)
+        if line is None:
+            return "break"
+        viewer.selection_anchor = line
+        self._set_viewer_selection(viewer, line, line)
+        return "break"
+
+    def _handle_selection_drag(self, viewer: ViewerPane, event: Any) -> str:
+        line = self._line_from_event(viewer, event)
+        if line is None:
+            return "break"
+        anchor = (
+            viewer.selection_anchor if viewer.selection_anchor is not None else line
+        )
+        self._set_viewer_selection(viewer, anchor, line)
+        return "break"
+
+    def _handle_selection_end(self, viewer: ViewerPane, event: Any) -> str:
+        line = self._line_from_event(viewer, event)
+        if line is not None:
+            anchor = (
+                viewer.selection_anchor if viewer.selection_anchor is not None else line
+            )
+            self._set_viewer_selection(viewer, anchor, line)
+        viewer.selection_anchor = None
+        return "break"
+
+    def _line_from_event(self, viewer: ViewerPane, event: Any) -> int | None:
+        widget = viewer.text_widget
+        try:
+            index = widget.index(f"@{getattr(event, 'x', 0)},{getattr(event, 'y', 0)}")
+        except Exception:  # pragma: no cover - depends on Tk
+            return None
+        return self._line_from_index(index, viewer)
+
+    def _line_from_index(self, index: Any, viewer: ViewerPane) -> int | None:
+        try:
+            line_text = str(index).split(".")[0]
+            line_number = int(line_text)
+        except (ValueError, AttributeError):  # pragma: no cover - defensive
+            return None
+        return self._clamp_line(viewer, line_number)
+
+    def _clamp_line(self, viewer: ViewerPane, line_number: int) -> int:
+        if viewer.line_count <= 0:
+            return 1
+        return max(1, min(line_number, viewer.line_count))
+
+    def _set_viewer_selection(
+        self,
+        viewer: ViewerPane,
+        start_line: int | None,
+        end_line: int | None = None,
+    ) -> None:
+        if start_line is None:
+            self._clear_viewer_selection(viewer)
+            return
+        if end_line is None:
+            end_line = start_line
+        start = self._clamp_line(viewer, start_line)
+        end = self._clamp_line(viewer, end_line)
+        if end < start:
+            start, end = end, start
+        viewer.selection_start = start
+        viewer.selection_end = end
+        viewer.text_widget.tag_remove(LINE_SELECTION_TAG, "1.0", self._tk.END)
+        line_limit = viewer.line_count if viewer.line_count > 0 else 1
+        end_index = min(end + 1, line_limit + 1)
+        viewer.text_widget.tag_add(
+            LINE_SELECTION_TAG,
+            f"{start}.0",
+            f"{end_index}.0",
+        )
+        self._update_selection_summary()
+
+    def _clear_viewer_selection(self, viewer: ViewerPane) -> None:
+        viewer.selection_start = None
+        viewer.selection_end = None
+        viewer.selection_anchor = None
+        viewer.text_widget.tag_remove(LINE_SELECTION_TAG, "1.0", self._tk.END)
+        self._update_selection_summary()
+
+    def _clear_all_selections(self) -> None:
+        if self._left_viewer is not None:
+            self._clear_viewer_selection(self._left_viewer)
+        if self._right_viewer is not None:
+            self._clear_viewer_selection(self._right_viewer)
+
+    def _update_selection_summary(self) -> None:
+        left_text = self._format_selection(self._left_viewer)
+        right_text = self._format_selection(self._right_viewer)
+        self.selection_var.set(f"Selections: Left {left_text}, Right {right_text}")
+
+    def _format_selection(self, viewer: ViewerPane | None) -> str:
+        if viewer is None or viewer.selection_start is None:
+            return "—"
+        end = (
+            viewer.selection_end
+            if viewer.selection_end is not None
+            else viewer.selection_start
+        )
+        if end == viewer.selection_start:
+            return f"L{viewer.selection_start}"
+        return f"L{viewer.selection_start}–L{end}"
+
+    def _update_viewer_label(self, viewer: ViewerPane) -> None:
+        suffix = viewer.file_path if viewer.file_path else "No file loaded"
+        viewer.label_var.set(f"{viewer.label_prefix} — {suffix}")
+
+    # ------------------------------------------------------------------
+    # Files panel helpers
+    # ------------------------------------------------------------------
+
     def _bind_shortcuts(self) -> None:
-        bindings = {
+        placeholder_bindings = {
             "<Control-n>": "New Project",
             "<Control-o>": "Open Project",
             "<Control-s>": "Save",
-            "<Control-Return>": "Create Link",
             "<Control-k>": "Check Staleness",
             "<Control-plus>": "Increase Font Size",
             "<Control-minus>": "Decrease Font Size",
             "<Alt-w>": "Toggle Line Wrapping",
-            "<Escape>": "Clear selections",
         }
-        for sequence, action in bindings.items():
+        for sequence, action in placeholder_bindings.items():
             self.root.bind(sequence, self._shortcut_handler(action))
+        self.root.bind("<Control-Return>", self._invoke_create_link_shortcut)
+        self.root.bind("<Escape>", self._clear_selections_shortcut)
 
     def _shortcut_handler(self, action: str) -> Callable[[Any], str]:
         def handler(event: Any) -> str:
@@ -463,8 +617,15 @@ class KleuwGUI:
 
         return handler
 
+    def _invoke_create_link_shortcut(self, _event: Any) -> str:
+        self._create_link()
+        return "break"
+
+    def _clear_selections_shortcut(self, _event: Any) -> str:
+        self._clear_all_selections()
+        return "break"
+
     def _placeholder_action(self, action: str) -> None:
-        self.selection_var.set(f"Action requested: {action}")
         self._messagebox.showinfo(
             title="Kleuw", message=f"{action} is not implemented yet."
         )
@@ -558,16 +719,18 @@ class KleuwGUI:
         viewer.text_widget.yview_moveto(0.0)
         viewer.text_widget.xview_moveto(0.0)
         viewer.line_numbers_widget.yview_moveto(0.0)
-        viewer.label_var.set(f"{viewer.label_prefix} — {path}")
         viewer.file_path = path
         viewer.line_count = line_count
+        self._update_viewer_label(viewer)
+        self._clear_viewer_selection(viewer)
+        self._update_create_button_state()
 
     def _set_text(self, widget: Any, text_value: str) -> None:
         widget.configure(state=self._tk.NORMAL)
         widget.delete("1.0", self._tk.END)
         if text_value:
             widget.insert("1.0", text_value)
-        widget.configure(state=self._tk.DISABLED)
+        widget.configure(state=self._tk.NORMAL)
 
     def _normalize_newlines(self, content: str) -> str:
         normalized = content.replace("\r\n", "\n").replace("\r", "\n")
@@ -577,6 +740,172 @@ class KleuwGUI:
         if not content:
             return 1
         return content.count("\n") + 1
+
+    # ------------------------------------------------------------------
+    # Link workspace helpers
+    # ------------------------------------------------------------------
+    def _viewer_has_file(self, viewer: ViewerPane | None) -> bool:
+        return bool(viewer and viewer.file_path)
+
+    def _update_create_button_state(self) -> None:
+        if self._create_link_button is None:
+            return
+        enabled = (
+            self._viewer_has_file(self._left_viewer)
+            and self._viewer_has_file(self._right_viewer)
+            and bool(self.relationship_var.get())
+        )
+        state = self._tk.NORMAL if enabled else self._tk.DISABLED
+        self._create_link_button.configure(state=state)
+
+    def _swap_viewer_files(self) -> None:
+        if self._left_viewer is None or self._right_viewer is None:
+            return
+        left_snapshot = self._capture_viewer_snapshot(self._left_viewer)
+        right_snapshot = self._capture_viewer_snapshot(self._right_viewer)
+        self._restore_viewer_snapshot(self._left_viewer, right_snapshot)
+        self._restore_viewer_snapshot(self._right_viewer, left_snapshot)
+        self._update_create_button_state()
+
+    def _capture_viewer_snapshot(self, viewer: ViewerPane) -> dict[str, Any]:
+        selection: tuple[int, int] | None = None
+        if viewer.selection_start is not None:
+            end = (
+                viewer.selection_end
+                if viewer.selection_end is not None
+                else viewer.selection_start
+            )
+            selection = (viewer.selection_start, end)
+        return {
+            "file_path": viewer.file_path,
+            "line_count": viewer.line_count,
+            "text": self._get_widget_text(viewer.text_widget),
+            "line_numbers": self._get_widget_text(viewer.line_numbers_widget),
+            "selection": selection,
+        }
+
+    def _restore_viewer_snapshot(
+        self, viewer: ViewerPane, snapshot: dict[str, Any]
+    ) -> None:
+        self._set_text(viewer.text_widget, snapshot.get("text", ""))
+        self._set_text(viewer.line_numbers_widget, snapshot.get("line_numbers", ""))
+        viewer.line_count = int(snapshot.get("line_count", 0))
+        viewer.file_path = snapshot.get("file_path")
+        self._update_viewer_label(viewer)
+        selection = snapshot.get("selection")
+        if selection is None:
+            self._clear_viewer_selection(viewer)
+        else:
+            self._set_viewer_selection(viewer, selection[0], selection[1])
+
+    def _get_widget_text(self, widget: Any) -> str:
+        try:
+            text = widget.get("1.0", self._tk.END)
+        except Exception:  # pragma: no cover - defensive
+            return ""
+        return str(text).rstrip("\n")
+
+    def _line_span_for_viewer(self, viewer: ViewerPane) -> LineSpan | None:
+        if viewer.selection_start is None:
+            return None
+        end = (
+            viewer.selection_end
+            if viewer.selection_end is not None
+            else viewer.selection_start
+        )
+        return LineSpan(start=viewer.selection_start, end=end)
+
+    def _build_target_for_viewer(self, viewer: ViewerPane, *, label: str) -> Target:
+        if viewer.file_path is None:
+            raise ValueError(f"No file is loaded in the {label} viewer.")
+        lines = self._line_span_for_viewer(viewer)
+        region_hash = self._compute_target_hash(
+            viewer.file_path, lines=lines, label=label
+        )
+        file_entry = self._project.find_file_by_path(viewer.file_path)
+        if file_entry is not None:
+            file_id = file_entry.get("id") if isinstance(file_entry, dict) else None
+            if file_id:
+                return Target(
+                    file_id=str(file_id), lines=lines, region_hash=region_hash
+                )
+        return Target(path=viewer.file_path, lines=lines, region_hash=region_hash)
+
+    def _compute_target_hash(
+        self, path: str, *, lines: LineSpan | None, label: str
+    ) -> RegionHash:
+        start_line = lines.start if lines is not None else None
+        end_line = lines.end if lines is not None else None
+        try:
+            return compute_region_hash(path, start_line=start_line, end_line=end_line)
+        except FileNotFoundError as exc:
+            raise ValueError(
+                f"{label.capitalize()} file '{path}' does not exist."
+            ) from exc
+        except UnicodeDecodeError as exc:
+            raise ValueError(
+                f"{label.capitalize()} file '{path}' is not valid UTF-8."
+            ) from exc
+        except ValueError as exc:
+            raise ValueError(f"Invalid line range for {label}: {exc}") from exc
+
+    def _generate_link_id(self) -> str:
+        counter = 1
+        while True:
+            candidate = f"link-{counter}"
+            if not self._project.find_link_by_id(candidate):
+                return candidate
+            counter += 1
+
+    def _create_link(self) -> None:
+        if not (self._left_viewer and self._right_viewer):
+            return
+        if not self._viewer_has_file(self._left_viewer) or not self._viewer_has_file(
+            self._right_viewer
+        ):
+            self._messagebox.showinfo(
+                title="Kleuw",
+                message="Load files into both viewers before creating a link.",
+            )
+            return
+        relationship_value = self.relationship_var.get().strip()
+        if not relationship_value:
+            self._messagebox.showinfo(
+                title="Kleuw",
+                message="Select a relationship type before creating a link.",
+            )
+            return
+        try:
+            link_type = LinkType(relationship_value)
+        except ValueError:
+            self._messagebox.showerror(
+                title="Kleuw",
+                message=f"Unknown relationship type '{relationship_value}'.",
+            )
+            return
+        try:
+            src_target = self._build_target_for_viewer(
+                self._left_viewer, label="source"
+            )
+            dst_target = self._build_target_for_viewer(
+                self._right_viewer, label="destination"
+            )
+        except ValueError as exc:
+            self._messagebox.showerror(title="Kleuw", message=str(exc))
+            return
+        link = Link(
+            id=self._generate_link_id(),
+            type=link_type,
+            src=src_target,
+            dst=dst_target,
+        )
+        try:
+            self._project.add_link(link)
+        except ValueError as exc:
+            self._messagebox.showerror(title="Kleuw", message=str(exc))
+            return
+        self.dirty_var.set("● Unsaved changes")
+        self._update_create_button_state()
 
     def run(self) -> None:
         """Start the Tkinter main loop."""
