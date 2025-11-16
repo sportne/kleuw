@@ -7,19 +7,22 @@ The CLI will eventually satisfy the workflow requirements described in
 from __future__ import annotations
 
 import json
+import re
 import sys
 from argparse import ArgumentParser, Namespace, _SubParsersAction
 from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
-from .hashing import compute_file_hash
+from .hashing import compute_file_hash, compute_region_hash
 from .io import ProjectIOError, load_project, save_project
 from .model import FileEntry, HashDigest, LineSpan, Link, LinkType, RegionHash, Target
 from .project import Project
 from .staleness import check_link_staleness
 
 __all__ = ["build_parser", "main", "DEFAULT_PARSER"]
+
+_LINE_RANGE_PATTERN = re.compile(r":(\d+(?:-\d+)?)$")
 
 CommandHandler = Callable[[Namespace], int]
 if TYPE_CHECKING:
@@ -419,6 +422,124 @@ def _generate_file_id(project: Project) -> str:
         counter += 1
 
 
+def _generate_link_id(project: Project) -> str:
+    """Return the next available ``link-<n>`` identifier for ``project``."""
+
+    counter = 1
+    while True:
+        candidate = f"link-{counter}"
+        if not project.find_link_by_id(candidate):
+            return candidate
+        counter += 1
+
+
+def _parse_target_argument(value: str, *, label: str) -> tuple[str, LineSpan | None]:
+    """Split ``value`` into ``(path, LineSpan | None)`` using CLI syntax."""
+
+    text = value.strip()
+    if not text:
+        raise ValueError(f"{label.capitalize()} target cannot be empty.")
+
+    match = _LINE_RANGE_PATTERN.search(text)
+    if match:
+        line_spec = match.group(1)
+        path_text = text[: match.start()]
+        if not path_text:
+            raise ValueError(f"{label.capitalize()} path cannot be empty.")
+        lines = _parse_line_spec(line_spec, label=label)
+    else:
+        path_text = text
+        lines = None
+
+    return path_text, lines
+
+
+def _parse_line_spec(spec: str, *, label: str) -> LineSpan:
+    """Parse ``spec`` into a :class:`LineSpan`."""
+
+    if "-" in spec:
+        start_text, end_text = spec.split("-", 1)
+        if not end_text:
+            raise ValueError(f"Invalid line range for {label}: missing end line.")
+    else:
+        start_text = spec
+        end_text = None
+
+    try:
+        start = int(start_text)
+    except ValueError as exc:  # pragma: no cover - defensive
+        raise ValueError(
+            f"Invalid line range for {label}: '{start_text}' is not a number."
+        ) from exc
+    if start < 1:
+        raise ValueError(f"Invalid line range for {label}: start must be >= 1.")
+
+    end = None
+    if end_text is not None:
+        try:
+            end = int(end_text)
+        except ValueError as exc:  # pragma: no cover - defensive
+            raise ValueError(
+                f"Invalid line range for {label}: '{end_text}' is not a number."
+            ) from exc
+        if end < start:
+            raise ValueError(f"Invalid line range for {label}: end must be >= start.")
+
+    try:
+        return LineSpan(start=start, end=end)
+    except ValueError as exc:  # pragma: no cover - dataclass validation
+        raise ValueError(f"Invalid line range for {label}: {exc}") from exc
+
+
+def _parse_tags(value: str | None) -> tuple[str, ...]:
+    """Return normalized tags parsed from ``value``."""
+
+    if value is None:
+        return ()
+    tags = [tag.strip() for tag in value.split(",")]
+    if not all(tags) or not tags:
+        raise ValueError("Tags must be non-empty strings.")
+    return tuple(tags)
+
+
+def _build_target(
+    project: Project,
+    *,
+    path_text: str,
+    lines: LineSpan | None,
+    label: str,
+) -> Target:
+    """Create a :class:`Target` for ``path_text`` and ``lines``."""
+
+    region_hash = _compute_target_hash(path_text, lines=lines, label=label)
+    file_entry = project.find_file_by_path(path_text)
+    if file_entry is not None:
+        file_id = str(file_entry["id"])
+        return Target(file_id=file_id, lines=lines, region_hash=region_hash)
+    return Target(path=path_text, lines=lines, region_hash=region_hash)
+
+
+def _compute_target_hash(
+    path_text: str, *, lines: LineSpan | None, label: str
+) -> RegionHash:
+    """Compute a region hash for ``path_text`` and ``lines``."""
+
+    start_line = lines.start if lines is not None else None
+    end_line = lines.end if lines is not None else None
+    try:
+        return compute_region_hash(path_text, start_line=start_line, end_line=end_line)
+    except FileNotFoundError as exc:
+        raise ValueError(
+            f"{label.capitalize()} file '{path_text}' does not exist."
+        ) from exc
+    except UnicodeDecodeError as exc:
+        raise ValueError(
+            f"{label.capitalize()} file '{path_text}' is not valid UTF-8."
+        ) from exc
+    except ValueError as exc:
+        raise ValueError(f"Invalid line range for {label}: {exc}") from exc
+
+
 def _handle_init(args: Namespace) -> int:
     """Create a new Kleuw project JSON file."""
 
@@ -525,9 +646,69 @@ def _handle_list_files(args: Namespace) -> int:
 
 
 def _handle_create_link(args: Namespace) -> int:
-    """Placeholder handler for the ``create-link`` subcommand."""
+    """Create a new traceability link between two targets."""
 
-    return _unimplemented("create-link")
+    project_path = Path(args.project)
+    try:
+        project = load_project(project_path)
+    except ProjectIOError as exc:
+        _print_error(str(exc))
+        return 1
+
+    try:
+        link_type = LinkType(args.type)
+    except ValueError:
+        _print_error(f"Unknown link type '{args.type}'.")
+        return 1
+
+    try:
+        src_path, src_lines = _parse_target_argument(args.src, label="source")
+        dst_path, dst_lines = _parse_target_argument(args.dst, label="destination")
+    except ValueError as exc:
+        _print_error(str(exc))
+        return 1
+
+    try:
+        tags = _parse_tags(args.tags)
+    except ValueError as exc:
+        _print_error(str(exc))
+        return 1
+
+    try:
+        src_target = _build_target(
+            project, path_text=src_path, lines=src_lines, label="source"
+        )
+        dst_target = _build_target(
+            project, path_text=dst_path, lines=dst_lines, label="destination"
+        )
+    except ValueError as exc:
+        _print_error(str(exc))
+        return 1
+
+    link_id = _generate_link_id(project)
+    link = Link(
+        id=link_id,
+        type=link_type,
+        src=src_target,
+        dst=dst_target,
+        tags=tags,
+        note=args.note,
+    )
+
+    try:
+        project.add_link(link)
+    except ValueError as exc:
+        _print_error(str(exc))
+        return 1
+
+    try:
+        save_project(project_path, project)
+    except ProjectIOError as exc:
+        _print_error(str(exc))
+        return 1
+
+    print(link_id)
+    return 0
 
 
 def _handle_list_links(args: Namespace) -> int:

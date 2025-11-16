@@ -190,7 +190,7 @@
     },
     {
       "id": "T-011",
-      "status": "To Do",
+      "status": "complete",
       "title": "Implement CLI: create-link",
       "description": "Implement the `create-link` command to parse region syntax, create link objects, compute region hashes, and append them to the project.",
       "depends_on": [
