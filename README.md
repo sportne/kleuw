@@ -1,5 +1,10 @@
 # Kleuw
 
+[![CI](https://img.shields.io/badge/CI-make%20ci-blue?style=flat-square)](#running-all-checks)
+[![Coverage](https://img.shields.io/badge/coverage-%E2%89%A580%25-brightgreen?style=flat-square)](#running-all-checks)
+[![Python](https://img.shields.io/badge/python-3.10+-blue?style=flat-square)](pyproject.toml)
+[![License](https://img.shields.io/badge/license-Proprietary-orange?style=flat-square)](LICENSE)
+
 Kleuw is a tool for capturing, managing, and validating semantic relationships between files — including line‑level links — and detecting staleness when linked regions change.
 
 This project offers both a **CLI** and a **Tkinter‑based GUI** for inspecting files side‑by‑side, selecting line ranges, and defining typed relationships.
