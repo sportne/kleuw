@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
@@ -10,7 +10,8 @@ from typing import Any
 import pytest
 
 from kleuw.gui import KleuwGUI
-from kleuw.model import LineSpan, LinkType
+from kleuw.hashing import compute_region_hash
+from kleuw.model import LineSpan, Link, LinkType, Target
 from kleuw.project import Project
 from tests._gui_stubs import StubMessageBox, StubRoot, StubStringVar
 
@@ -196,12 +197,15 @@ class _FakeLabel(_BaseWidget):
 
 
 class _FakeButton(_BaseWidget):
+    instances: list[_FakeButton] = []
+
     def __init__(
         self, *_args: Any, command: Callable[..., Any] | None = None, **_kwargs: Any
     ) -> None:
         super().__init__()
         self.command = command
         self.state = "normal"
+        self.__class__.instances.append(self)
 
     def configure(self, **kwargs: Any) -> None:
         if "state" in kwargs:
@@ -259,6 +263,8 @@ class _FakeTreeview(_BaseWidget):
         self.items: dict[str, tuple[str, ...]] = {}
         self.order: list[str] = []
         self._selection: tuple[str, ...] = ()
+        self.tag_styles: dict[str, dict[str, Any]] = {}
+        self.item_tags: dict[str, tuple[str, ...]] = {}
 
     def heading(self, *_args: Any, **_kwargs: Any) -> None:
         return None
@@ -279,11 +285,13 @@ class _FakeTreeview(_BaseWidget):
         *,
         iid: str | None = None,
         values: tuple[str, ...],
+        tags: Sequence[str] | None = None,
     ) -> str:
         identifier = iid if iid is not None else f"row-{len(self.rows)}"
         self.rows.append(values)
         self.items[identifier] = values
         self.order.append(identifier)
+        self.item_tags[identifier] = tuple(tags) if tags else ()
         return identifier
 
     def yview(self, *args: Any) -> None:
@@ -307,7 +315,12 @@ class _FakeTreeview(_BaseWidget):
     def delete(self, item: str) -> None:
         if item in self.items:
             del self.items[item]
+        if item in self.item_tags:
+            del self.item_tags[item]
         self.order = [existing for existing in self.order if existing != item]
+
+    def tag_configure(self, name: str, **kwargs: Any) -> None:
+        self.tag_styles[name] = kwargs
 
 
 class _FakeSeparator(_BaseWidget):
@@ -350,6 +363,7 @@ def functional_tk_module() -> SimpleNamespace:
     module.LEFT = "left"
     module.RIGHT = "right"
     module.W = "west"
+    module.E = "east"
     module.TOP = "top"
     module.BOTTOM = "bottom"
     module.X = "x"
@@ -374,6 +388,7 @@ def functional_ttk_module() -> SimpleNamespace:
     module = SimpleNamespace()
     module.Frame = _FakeFrame
     module.Button = _FakeButton
+    module.Button.instances = []
     module.Label = _FakeLabel
     module.PanedWindow = _FakePanedWindow
     module.Scrollbar = _FakeScrollbar
@@ -724,6 +739,41 @@ def _project_with_links(tmp_path: Path) -> tuple[Project, Path, Path]:
     return project, left_file, right_file
 
 
+def _project_with_hashed_link(tmp_path: Path) -> tuple[Project, Path, Path]:
+    left_file = tmp_path / "left.txt"
+    right_file = tmp_path / "right.txt"
+    left_file.write_text("left-one\nleft-two\n")
+    right_file.write_text("right-one\nright-two\n")
+    project = Project(
+        files=[
+            {"id": "src", "path": str(left_file)},
+            {"id": "dst", "path": str(right_file)},
+        ],
+        links=[],
+    )
+    project.add_link(
+        Link(
+            id="L1",
+            type=LinkType.IMPLEMENTS,
+            src=Target(
+                file_id="src",
+                lines=LineSpan(start=1, end=1),
+                region_hash=compute_region_hash(
+                    str(left_file), start_line=1, end_line=1
+                ),
+            ),
+            dst=Target(
+                file_id="dst",
+                lines=LineSpan(start=1, end=1),
+                region_hash=compute_region_hash(
+                    str(right_file), start_line=1, end_line=1
+                ),
+            ),
+        )
+    )
+    return project, left_file, right_file
+
+
 def test_links_panel_populates_with_project_links(
     tmp_path: Path,
     functional_tk_module: SimpleNamespace,
@@ -745,7 +795,7 @@ def test_links_panel_populates_with_project_links(
         LinkType.IMPLEMENTS.value,
         f"{left_file} L2–L3",
         f"{right_file} L1",
-        "No",
+        "Unknown",
         "",
         "",
     )
@@ -801,6 +851,114 @@ def test_navigate_to_link_loads_files_and_selections(
     assert gui._left_viewer.selection_end == 3
     assert gui._right_viewer.file_path == str(right_file)
     assert gui._right_viewer.selection_start == 1
+
+
+def test_check_staleness_updates_summary_and_rows(
+    tmp_path: Path,
+    functional_tk_module: SimpleNamespace,
+    functional_ttk_module: SimpleNamespace,
+    stub_messagebox: StubMessageBox,
+) -> None:
+    project, _left_file, _right_file = _project_with_hashed_link(tmp_path)
+    gui = _make_gui(
+        StubRoot(),
+        functional_tk_module,
+        functional_ttk_module,
+        stub_messagebox,
+        SimpleNamespace(askopenfilenames=lambda **_: ()),
+        project=project,
+    )
+
+    button_start = len(functional_ttk_module.Button.instances)
+    gui._run_staleness_check()
+    dialog_buttons = functional_ttk_module.Button.instances[button_start:]
+
+    assert gui._links_tree is not None
+    assert gui._links_tree.items["L1"][4] == "No"  # type: ignore[index]
+    assert gui.staleness_var.get() == "Staleness: 0 stale of 1"
+    assert dialog_buttons
+    assert dialog_buttons[0].state == "disabled"  # type: ignore[index]
+    assert gui._show_all_links_button is not None
+    assert gui._show_all_links_button.state == "disabled"  # type: ignore[union-attr]
+
+
+def test_view_stale_links_filters_tree(
+    tmp_path: Path,
+    functional_tk_module: SimpleNamespace,
+    functional_ttk_module: SimpleNamespace,
+    stub_messagebox: StubMessageBox,
+) -> None:
+    project, left_file, right_file = _project_with_hashed_link(tmp_path)
+    project.add_link(
+        Link(
+            id="L2",
+            type=LinkType.DEPENDS_ON,
+            src=Target(
+                file_id="src",
+                lines=LineSpan(start=2, end=2),
+                region_hash=compute_region_hash(
+                    str(left_file), start_line=2, end_line=2
+                ),
+            ),
+            dst=Target(
+                file_id="dst",
+                lines=LineSpan(start=2, end=2),
+                region_hash=compute_region_hash(
+                    str(right_file), start_line=2, end_line=2
+                ),
+            ),
+        )
+    )
+    left_file.write_text("left-one\nchanged-two\n")
+    gui = _make_gui(
+        StubRoot(),
+        functional_tk_module,
+        functional_ttk_module,
+        stub_messagebox,
+        SimpleNamespace(askopenfilenames=lambda **_: ()),
+        project=project,
+    )
+
+    button_start = len(functional_ttk_module.Button.instances)
+    gui._run_staleness_check()
+    dialog_buttons = functional_ttk_module.Button.instances[button_start:]
+    assert dialog_buttons
+    view_button = dialog_buttons[0]
+    assert view_button.command is not None
+    view_button.command()
+
+    assert gui._links_tree is not None
+    assert gui._links_tree.items["L2"][4] == "Yes"  # type: ignore[index]
+    assert gui._links_tree.item_tags["L2"] == ("stale",)  # type: ignore[index]
+
+    assert gui._links_tree.get_children() == ("L2",)
+    assert gui.staleness_var.get().endswith("(filtered)")
+    assert gui._show_all_links_button is not None
+    assert gui._show_all_links_button.state == "normal"  # type: ignore[union-attr]
+
+    gui._clear_links_filter()
+    assert set(gui._links_tree.get_children()) == {"L1", "L2"}
+
+
+def test_check_staleness_handles_invalid_links(
+    functional_tk_module: SimpleNamespace,
+    functional_ttk_module: SimpleNamespace,
+    stub_messagebox: StubMessageBox,
+) -> None:
+    project = Project(links=[{"id": "broken", "type": LinkType.IMPLEMENTS.value}])
+    gui = _make_gui(
+        StubRoot(),
+        functional_tk_module,
+        functional_ttk_module,
+        stub_messagebox,
+        SimpleNamespace(askopenfilenames=lambda **_: ()),
+        project=project,
+    )
+
+    gui._run_staleness_check()
+
+    assert stub_messagebox.error_calls
+    assert "Invalid" in stub_messagebox.error_calls[-1][1]
 
 
 def test_delete_selected_link_updates_project(

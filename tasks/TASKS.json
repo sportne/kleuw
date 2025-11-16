@@ -318,7 +318,7 @@
     },
     {
       "id": "T-018",
-      "status": "To Do",
+      "status": "complete",
       "title": "Implement GUI staleness check integration",
       "description": "Wire the staleness detection logic into the GUI, including Check Staleness toolbar button, dialog summary, and visual marking of stale links.",
       "depends_on": [

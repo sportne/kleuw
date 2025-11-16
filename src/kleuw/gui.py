@@ -8,7 +8,7 @@ Future tasks will wire these controls into the backing project model.
 from __future__ import annotations
 
 import tkinter as tk
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from functools import partial
 from pathlib import Path
@@ -16,8 +16,9 @@ from tkinter import filedialog, messagebox, ttk
 from typing import Any
 
 from kleuw.hashing import compute_region_hash
-from kleuw.model import LineSpan, Link, LinkType, RegionHash, Target
+from kleuw.model import HashDigest, LineSpan, Link, LinkType, RegionHash, Target
 from kleuw.project import Project
+from kleuw.staleness import LinkStalenessResult, check_link_staleness
 
 __all__ = ["KleuwGUI", "launch"]
 
@@ -217,6 +218,10 @@ class KleuwGUI:
         self.relationship_var = self._tk.StringVar(value="")
         self._create_link_button: Any | None = None
         self._links_tree: Any | None = None
+        self._show_all_links_button: Any | None = None
+        self._staleness_results: dict[str, LinkStalenessResult] = {}
+        self._staleness_summary: tuple[int, int] | None = None
+        self._show_stale_only = False
 
         style = self._ttk.Style()
         style.configure("Tooltip.TLabel", background="#ffffe0")
@@ -228,6 +233,13 @@ class KleuwGUI:
         self._bind_shortcuts()
         self._update_selection_summary()
 
+    def _get_action_callback(self, action: str) -> Callable[[], None]:
+        callbacks: dict[str, Callable[[], None]] = {
+            "Check Staleness": self._run_staleness_check,
+            "Create Link": self._create_link,
+        }
+        return callbacks.get(action, partial(self._placeholder_action, action))
+
     def _build_menu_bar(self) -> None:
         menu_bar = self._tk.Menu(self.root)
         for menu_label, items in MENU_DEFINITION:
@@ -238,7 +250,7 @@ class KleuwGUI:
                     continue
                 menu.add_command(
                     label=item.label,
-                    command=partial(self._placeholder_action, item.label),
+                    command=self._get_action_callback(item.label),
                 )
             menu_bar.add_cascade(label=menu_label, menu=menu)
         self.root.config(menu=menu_bar)
@@ -250,7 +262,7 @@ class KleuwGUI:
             widget = self._ttk.Button(
                 toolbar,
                 text=button.label,
-                command=partial(self._placeholder_action, button.label),
+                command=self._get_action_callback(button.label),
                 padding=(8, 2),
             )
             widget.pack(side=self._tk.LEFT, padx=4)
@@ -434,6 +446,7 @@ class KleuwGUI:
         for column in columns:
             tree.heading(column, text=column)
             tree.column(column, width=120, anchor=self._tk.W)
+        tree.tag_configure("stale", background="#fff9c4")
         y_scroll = self._ttk.Scrollbar(
             parent, orient=self._tk.VERTICAL, command=tree.yview
         )
@@ -462,7 +475,15 @@ class KleuwGUI:
             text="Delete Link",
             command=self._delete_selected_links,
         ).pack(side=self._tk.LEFT)
+        self._show_all_links_button = self._ttk.Button(
+            button_row,
+            text="Show All",
+            command=self._clear_links_filter,
+            state=self._tk.DISABLED,
+        )
+        self._show_all_links_button.pack(side=self._tk.LEFT, padx=(4, 0))
         self._refresh_links_panel()
+        self._update_links_filter_button()
 
     def _build_status_bar(self) -> None:
         bar = self._ttk.Frame(self.root, relief=self._tk.SUNKEN, padding=(8, 4))
@@ -482,6 +503,113 @@ class KleuwGUI:
             side=self._tk.LEFT, fill=self._tk.Y, padx=6
         )
         self._ttk.Label(bar, textvariable=self.staleness_var).pack(side=self._tk.LEFT)
+
+    # ------------------------------------------------------------------
+    # Staleness helpers
+    # ------------------------------------------------------------------
+    def _run_staleness_check(self) -> None:
+        try:
+            annotated = self._annotate_links_with_staleness()
+        except ValueError as exc:
+            self._messagebox.showerror(title="Kleuw", message=str(exc))
+            return
+
+        results = {result.link_id: result for _entry, result in annotated}
+        stale_count = sum(1 for _entry, result in annotated if result.stale)
+        self._staleness_results = results
+        self._staleness_summary = (len(annotated), stale_count)
+        self._set_stale_filter(False, force=True)
+        self._show_staleness_dialog(total=len(annotated), stale=stale_count)
+
+    def _annotate_links_with_staleness(
+        self,
+    ) -> list[tuple[dict[str, Any], LinkStalenessResult]]:
+        file_lookup = self._build_file_lookup()
+        annotated: list[tuple[dict[str, Any], LinkStalenessResult]] = []
+        for entry in self._project.links:
+            if not isinstance(entry, Mapping):
+                continue
+            entry_dict = entry
+            try:
+                link = _link_from_mapping(entry_dict)
+            except ValueError as exc:
+                identifier = entry_dict.get("id")
+                label = f"link '{identifier}'" if identifier else "link"
+                raise ValueError(f"Invalid {label}: {exc}") from exc
+            result = check_link_staleness(link, file_lookup=file_lookup)
+            annotated.append((entry_dict, result))
+        return annotated
+
+    def _build_file_lookup(self) -> dict[str, Mapping[str, Any]]:
+        lookup: dict[str, Mapping[str, Any]] = {}
+        for entry in self._project.files:
+            if not isinstance(entry, Mapping):
+                continue
+            file_id = entry.get("id")
+            if isinstance(file_id, str) and file_id:
+                lookup[file_id] = entry
+        return lookup
+
+    def _show_staleness_dialog(self, *, total: int, stale: int) -> None:
+        dialog = self._tk.Toplevel(self.root)
+        dialog.title("Staleness Check Complete")
+        dialog.transient(self.root)
+        dialog.grab_set()
+        content = self._ttk.Frame(dialog, padding=12)
+        content.pack(fill=self._tk.BOTH, expand=True)
+        self._ttk.Label(
+            content, text="Staleness Check Complete", font=("TkDefaultFont", 11, "bold")
+        ).pack(anchor=self._tk.W)
+        self._ttk.Label(content, text=f"Total Links: {total}").pack(
+            anchor=self._tk.W, pady=(8, 0)
+        )
+        self._ttk.Label(content, text=f"Stale Links: {stale}").pack(anchor=self._tk.W)
+
+        button_row = self._ttk.Frame(content, padding=(0, 12, 0, 0))
+        button_row.pack(anchor=self._tk.E, fill=self._tk.X)
+
+        def _view() -> None:
+            dialog.destroy()
+            if stale:
+                self._set_stale_filter(True)
+
+        view_button = self._ttk.Button(
+            button_row, text="View Stale Links", command=_view
+        )
+        view_button.pack(side=self._tk.LEFT, padx=(0, 4))
+        close_button = self._ttk.Button(
+            button_row, text="Close", command=dialog.destroy
+        )
+        close_button.pack(side=self._tk.LEFT)
+        if stale == 0:
+            view_button.configure(state=self._tk.DISABLED)
+
+    def _set_stale_filter(self, enabled: bool, *, force: bool = False) -> None:
+        if not force and self._show_stale_only == enabled:
+            return
+        self._show_stale_only = enabled
+        self._refresh_links_panel()
+        self._update_links_filter_button()
+        self._update_staleness_label()
+
+    def _clear_links_filter(self) -> None:
+        self._set_stale_filter(False)
+
+    def _update_links_filter_button(self) -> None:
+        if self._show_all_links_button is None:
+            return
+        state = self._tk.NORMAL if self._show_stale_only else self._tk.DISABLED
+        self._show_all_links_button.configure(state=state)
+
+    def _update_staleness_label(self) -> None:
+        if self._staleness_summary is None:
+            text = "Staleness: Unknown"
+        else:
+            total, stale = self._staleness_summary
+            text = f"Staleness: {stale} stale of {total}"
+            if self._show_stale_only:
+                text += " (filtered)"
+        self.staleness_var.set(text)
 
     @property
     def _relationship_values(self) -> tuple[str, ...]:
@@ -627,7 +755,8 @@ class KleuwGUI:
 
     def _shortcut_handler(self, action: str) -> Callable[[Any], str]:
         def handler(event: Any) -> str:
-            self._placeholder_action(action)
+            callback = self._get_action_callback(action)
+            callback()
             return "break"
 
         return handler
@@ -932,18 +1061,29 @@ class KleuwGUI:
         tree = self._links_tree
         for item in tree.get_children():
             tree.delete(item)
-        for link in self._project.links:
-            link_id = str(link.get("id", ""))
+        for entry in self._project.links:
+            if not isinstance(entry, Mapping):
+                continue
+            link_id = str(entry.get("id", ""))
+            result = self._staleness_results.get(link_id)
+            is_stale = bool(result and result.stale)
+            if self._show_stale_only and not is_stale:
+                continue
+            if result is None:
+                stale_text = "Unknown"
+            else:
+                stale_text = "Yes" if result.stale else "No"
             values = (
                 link_id,
-                str(link.get("type", "")),
-                self._format_target(link.get("src", {})),
-                self._format_target(link.get("dst", {})),
-                "No",
-                ", ".join(link.get("tags", [])) if link.get("tags") else "",
-                "Yes" if link.get("note") else "",
+                str(entry.get("type", "")),
+                self._format_target(entry.get("src", {})),
+                self._format_target(entry.get("dst", {})),
+                stale_text,
+                ", ".join(entry.get("tags", [])) if entry.get("tags") else "",
+                "Yes" if entry.get("note") else "",
             )
-            tree.insert("", self._tk.END, iid=link_id, values=values)
+            tags = ("stale",) if is_stale else ()
+            tree.insert("", self._tk.END, iid=link_id, values=values, tags=tags)
         if selected_id is not None:
             try:
                 tree.selection_set(selected_id)
@@ -1174,6 +1314,76 @@ class KleuwGUI:
         """Start the Tkinter main loop."""
 
         self.root.mainloop()
+
+
+def _link_from_mapping(entry: Mapping[str, Any]) -> Link:
+    src_data = entry.get("src")
+    dst_data = entry.get("dst")
+    if not isinstance(src_data, Mapping) or not isinstance(dst_data, Mapping):
+        raise ValueError("Links must define 'src' and 'dst' targets.")
+    link_type = entry.get("type")
+    if link_type is None:
+        raise ValueError("Links must define a 'type'.")
+    tags = entry.get("tags") or ()
+    if isinstance(tags, str):
+        tags_value: Sequence[str] = (tags,)
+    else:
+        try:
+            tags_value = tuple(str(tag) for tag in tags)
+        except TypeError as exc:  # pragma: no cover - defensive copy of CLI helper
+            raise ValueError("Link tags must be iterable.") from exc
+
+    directed = entry.get("directed")
+    directed_value = True if directed is None else bool(directed)
+    return Link(
+        id=str(entry.get("id", "")),
+        type=LinkType(link_type),
+        src=_target_from_mapping(src_data, region_key="src_region_hash"),
+        dst=_target_from_mapping(dst_data, region_key="dst_region_hash"),
+        directed=directed_value,
+        created=entry.get("created"),
+        author=entry.get("author"),
+        tags=tags_value,
+        note=entry.get("note"),
+    )
+
+
+def _target_from_mapping(target: Mapping[str, Any], *, region_key: str) -> Target:
+    file_id = target.get("file_id")
+    path = target.get("path")
+    lines = _line_span_from_mapping(target.get("lines"))
+    hash_data = target.get(region_key) or target.get("region_hash")
+    region_hash = _region_hash_from_mapping(hash_data) if hash_data else None
+    return Target(file_id=file_id, path=path, lines=lines, region_hash=region_hash)
+
+
+def _line_span_from_mapping(data: object | None) -> LineSpan | None:
+    if data is None:
+        return None
+    if isinstance(data, LineSpan):
+        return data
+    if not isinstance(data, Mapping):
+        raise ValueError("Line span must be a mapping.")
+    start = data.get("start")
+    end = data.get("end")
+    if not isinstance(start, int):
+        raise ValueError("Line span requires an integer 'start'.")
+    if end is not None and not isinstance(end, int):
+        raise ValueError("Line span 'end' must be an integer when provided.")
+    return LineSpan(start=start, end=end)
+
+
+def _region_hash_from_mapping(data: object) -> RegionHash:
+    if isinstance(data, RegionHash):
+        return data
+    if isinstance(data, HashDigest):
+        return RegionHash(algo=data.algo, value=data.value)
+    if isinstance(data, Mapping):
+        algo = data.get("algo")
+        value = data.get("value")
+        if isinstance(algo, str) and isinstance(value, str):
+            return RegionHash(algo=algo, value=value)
+    raise ValueError("Region hash must define 'algo' and 'value'.")
 
 
 def launch() -> None:
