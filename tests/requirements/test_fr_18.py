@@ -8,13 +8,13 @@ from pathlib import Path
 from kleuw import cli
 from kleuw.hashing import compute_region_hash
 from kleuw.io import load_project
-from tests.test_cli import _create_project_with_links
+from tests.requirements._cli_helpers import create_project_with_links
 
 
 def test_fr_18_cli_recompute_overwrites_region_hashes(tmp_path: Path, capsys) -> None:
     """FR-18: `kleuw recompute` refreshes stored region hashes."""
 
-    project_path, src_file, _dst_file = _create_project_with_links(tmp_path)
+    project_path, src_file, _dst_file = create_project_with_links(tmp_path)
 
     exit_code = cli._handle_recompute(
         Namespace(project=str(project_path), link_ids=None)
