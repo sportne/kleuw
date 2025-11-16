@@ -10,7 +10,7 @@ from typing import Any
 import pytest
 
 from kleuw.gui import KleuwGUI
-from kleuw.model import LinkType
+from kleuw.model import LineSpan, LinkType
 from kleuw.project import Project
 from tests._gui_stubs import StubMessageBox, StubRoot, StubStringVar
 
@@ -20,6 +20,11 @@ class _BaseWidget:
         self._bindings: dict[str, Callable[..., Any]] = {}
 
     def pack(
+        self, *_args: Any, **_kwargs: Any
+    ) -> None:  # pragma: no cover - layout helper
+        return None
+
+    def grid(
         self, *_args: Any, **_kwargs: Any
     ) -> None:  # pragma: no cover - layout helper
         return None
@@ -44,6 +49,12 @@ class _FakeMenu(_BaseWidget):
 
     def add_cascade(self, *, label: str, menu: Any) -> None:
         self.commands.append((label, menu))
+
+    def tk_popup(self, *_args: Any, **_kwargs: Any) -> None:  # pragma: no cover - noop
+        return None
+
+    def grab_release(self) -> None:  # pragma: no cover - noop
+        return None
 
 
 class _FakeListbox(_BaseWidget):
@@ -198,6 +209,29 @@ class _FakeButton(_BaseWidget):
 
     config = configure
 
+
+class _FakeEntry(_BaseWidget):
+    def __init__(
+        self, *_args: Any, textvariable: StubStringVar | None = None, **_kwargs: Any
+    ) -> None:
+        super().__init__()
+        self.textvariable = textvariable
+        self.value = textvariable.get() if textvariable is not None else ""
+
+    def get(self) -> str:
+        return self.value
+
+    def insert(self, index: Any, value: str) -> None:  # pragma: no cover - unused
+        self.value = value
+
+    def delete(
+        self, start: Any, end: Any | None = None
+    ) -> None:  # pragma: no cover - unused
+        self.value = ""
+
+    def focus_set(self) -> None:  # pragma: no cover - noop
+        return None
+
     def invoke(self) -> None:
         if self.command is not None:
             self.command()
@@ -222,6 +256,9 @@ class _FakeTreeview(_BaseWidget):
         self.rows: list[tuple[str, ...]] = []
         self.yscrollcommand: Callable[..., Any] | None = None
         self.last_yview: tuple[Any, ...] | None = None
+        self.items: dict[str, tuple[str, ...]] = {}
+        self.order: list[str] = []
+        self._selection: tuple[str, ...] = ()
 
     def heading(self, *_args: Any, **_kwargs: Any) -> None:
         return None
@@ -235,11 +272,42 @@ class _FakeTreeview(_BaseWidget):
 
     config = configure
 
-    def insert(self, *_args: Any, values: tuple[str, ...]) -> None:
+    def insert(
+        self,
+        _parent: Any,
+        _index: Any,
+        *,
+        iid: str | None = None,
+        values: tuple[str, ...],
+    ) -> str:
+        identifier = iid if iid is not None else f"row-{len(self.rows)}"
         self.rows.append(values)
+        self.items[identifier] = values
+        self.order.append(identifier)
+        return identifier
 
     def yview(self, *args: Any) -> None:
         self.last_yview = args
+
+    def selection(self) -> tuple[str, ...]:
+        return self._selection
+
+    def selection_set(self, *items: Any) -> None:
+        flattened: list[str] = []
+        for entry in items:
+            if isinstance(entry, (list, tuple)):
+                flattened.extend(str(part) for part in entry)
+            else:
+                flattened.append(str(entry))
+        self._selection = tuple(flattened)
+
+    def get_children(self) -> tuple[str, ...]:
+        return tuple(self.order)
+
+    def delete(self, item: str) -> None:
+        if item in self.items:
+            del self.items[item]
+        self.order = [existing for existing in self.order if existing != item]
 
 
 class _FakeSeparator(_BaseWidget):
@@ -254,6 +322,9 @@ class _FakeStyle:
 
 
 class _FakeToplevel(_BaseWidget):
+    def title(self, *_args: Any, **_kwargs: Any) -> None:  # pragma: no cover - noop
+        return None
+
     def wm_overrideredirect(
         self, *_args: Any, **_kwargs: Any
     ) -> None:  # pragma: no cover - tooltip helper
@@ -262,6 +333,12 @@ class _FakeToplevel(_BaseWidget):
     def wm_geometry(
         self, *_args: Any, **_kwargs: Any
     ) -> None:  # pragma: no cover - tooltip helper
+        return None
+
+    def transient(self, *_args: Any, **_kwargs: Any) -> None:  # pragma: no cover - noop
+        return None
+
+    def grab_set(self, *_args: Any, **_kwargs: Any) -> None:  # pragma: no cover - noop
         return None
 
 
@@ -303,6 +380,7 @@ def functional_ttk_module() -> SimpleNamespace:
     module.Combobox = _FakeCombobox
     module.Treeview = _FakeTreeview
     module.Separator = _FakeSeparator
+    module.Entry = _FakeEntry
     module.Style = lambda *args, **kwargs: _FakeStyle()
     return module
 
@@ -555,3 +633,315 @@ def test_create_link_uses_project_and_hashes(
     assert "src_region_hash" in entry["src"]
     assert entry["dst"]["file_id"] == "dst"
     assert "lines" not in entry["dst"]
+
+
+def test_create_link_requires_files_loaded(
+    functional_tk_module: SimpleNamespace,
+    functional_ttk_module: SimpleNamespace,
+    stub_messagebox: StubMessageBox,
+) -> None:
+    gui = _make_gui(
+        StubRoot(),
+        functional_tk_module,
+        functional_ttk_module,
+        stub_messagebox,
+        SimpleNamespace(askopenfilenames=lambda **_: ()),
+    )
+    gui._create_link()
+    assert "Load files" in stub_messagebox.info_calls[-1][1]
+
+
+def test_create_link_requires_relationship_type(
+    tmp_path: Path,
+    functional_tk_module: SimpleNamespace,
+    functional_ttk_module: SimpleNamespace,
+    stub_messagebox: StubMessageBox,
+) -> None:
+    left = tmp_path / "left.txt"
+    right = tmp_path / "right.txt"
+    left.write_text("one")
+    right.write_text("two")
+    gui = _make_gui(
+        StubRoot(),
+        functional_tk_module,
+        functional_ttk_module,
+        stub_messagebox,
+        SimpleNamespace(askopenfilenames=lambda **_: ()),
+    )
+    assert gui._left_viewer is not None
+    assert gui._right_viewer is not None
+    gui._load_file_into_viewer(gui._left_viewer, str(left))
+    gui._load_file_into_viewer(gui._right_viewer, str(right))
+    gui._create_link()
+    assert "relationship type" in stub_messagebox.info_calls[-1][1]
+
+
+def test_create_link_rejects_unknown_relationship(
+    tmp_path: Path,
+    functional_tk_module: SimpleNamespace,
+    functional_ttk_module: SimpleNamespace,
+    stub_messagebox: StubMessageBox,
+) -> None:
+    left = tmp_path / "left.txt"
+    right = tmp_path / "right.txt"
+    left.write_text("one")
+    right.write_text("two")
+    gui = _make_gui(
+        StubRoot(),
+        functional_tk_module,
+        functional_ttk_module,
+        stub_messagebox,
+        SimpleNamespace(askopenfilenames=lambda **_: ()),
+    )
+    assert gui._left_viewer is not None
+    assert gui._right_viewer is not None
+    gui._load_file_into_viewer(gui._left_viewer, str(left))
+    gui._load_file_into_viewer(gui._right_viewer, str(right))
+    gui.relationship_var.set("invalid")
+    gui._create_link()
+    assert "Unknown relationship type" in stub_messagebox.error_calls[-1][1]
+
+
+def _project_with_links(tmp_path: Path) -> tuple[Project, Path, Path]:
+    left_file = tmp_path / "left.txt"
+    right_file = tmp_path / "right.txt"
+    left_file.write_text("one\ntwo\nthree")
+    right_file.write_text("alpha\nbeta")
+    project = Project(
+        files=[
+            {"id": "src", "path": str(left_file)},
+            {"id": "dst", "path": str(right_file)},
+        ],
+        links=[
+            {
+                "id": "L1",
+                "type": LinkType.IMPLEMENTS.value,
+                "src": {"file_id": "src", "lines": {"start": 2, "end": 3}},
+                "dst": {"file_id": "dst", "lines": {"start": 1}},
+            }
+        ],
+    )
+    return project, left_file, right_file
+
+
+def test_links_panel_populates_with_project_links(
+    tmp_path: Path,
+    functional_tk_module: SimpleNamespace,
+    functional_ttk_module: SimpleNamespace,
+    stub_messagebox: StubMessageBox,
+) -> None:
+    project, left_file, right_file = _project_with_links(tmp_path)
+    gui = _make_gui(
+        StubRoot(),
+        functional_tk_module,
+        functional_ttk_module,
+        stub_messagebox,
+        SimpleNamespace(askopenfilenames=lambda **_: ()),
+        project=project,
+    )
+    assert gui._links_tree is not None
+    expected = (
+        "L1",
+        LinkType.IMPLEMENTS.value,
+        f"{left_file} L2–L3",
+        f"{right_file} L1",
+        "No",
+        "",
+        "",
+    )
+    assert gui._links_tree.items["L1"] == expected  # type: ignore[index]
+
+
+def test_links_panel_shows_tags_and_note(
+    tmp_path: Path,
+    functional_tk_module: SimpleNamespace,
+    functional_ttk_module: SimpleNamespace,
+    stub_messagebox: StubMessageBox,
+) -> None:
+    project, left_file, right_file = _project_with_links(tmp_path)
+    link = project.find_link_by_id("L1")
+    assert link is not None
+    link["tags"] = ["alpha", "beta"]
+    link["note"] = "details"
+    gui = _make_gui(
+        StubRoot(),
+        functional_tk_module,
+        functional_ttk_module,
+        stub_messagebox,
+        SimpleNamespace(askopenfilenames=lambda **_: ()),
+        project=project,
+    )
+    assert gui._links_tree is not None
+    values = gui._links_tree.items["L1"]  # type: ignore[index]
+    assert values[5] == "alpha, beta"
+    assert values[6] == "Yes"
+
+
+def test_navigate_to_link_loads_files_and_selections(
+    tmp_path: Path,
+    functional_tk_module: SimpleNamespace,
+    functional_ttk_module: SimpleNamespace,
+    stub_messagebox: StubMessageBox,
+) -> None:
+    project, left_file, right_file = _project_with_links(tmp_path)
+    gui = _make_gui(
+        StubRoot(),
+        functional_tk_module,
+        functional_ttk_module,
+        stub_messagebox,
+        SimpleNamespace(askopenfilenames=lambda **_: ()),
+        project=project,
+    )
+    gui._navigate_to_link_id("L1")
+    assert gui.relationship_var.get() == LinkType.IMPLEMENTS.value
+    assert gui._left_viewer is not None
+    assert gui._right_viewer is not None
+    assert gui._left_viewer.file_path == str(left_file)
+    assert gui._left_viewer.selection_start == 2
+    assert gui._left_viewer.selection_end == 3
+    assert gui._right_viewer.file_path == str(right_file)
+    assert gui._right_viewer.selection_start == 1
+
+
+def test_delete_selected_link_updates_project(
+    tmp_path: Path,
+    functional_tk_module: SimpleNamespace,
+    functional_ttk_module: SimpleNamespace,
+    stub_messagebox: StubMessageBox,
+) -> None:
+    project, _left_file, _right_file = _project_with_links(tmp_path)
+    gui = _make_gui(
+        StubRoot(),
+        functional_tk_module,
+        functional_ttk_module,
+        stub_messagebox,
+        SimpleNamespace(askopenfilenames=lambda **_: ()),
+        project=project,
+    )
+    assert gui._links_tree is not None
+    gui._links_tree.selection_set("L1")  # type: ignore[union-attr]
+    gui._delete_selected_links()
+    assert project.links == []
+
+
+def test_apply_link_edit_updates_metadata(
+    tmp_path: Path,
+    functional_tk_module: SimpleNamespace,
+    functional_ttk_module: SimpleNamespace,
+    stub_messagebox: StubMessageBox,
+) -> None:
+    project, _left_file, _right_file = _project_with_links(tmp_path)
+    gui = _make_gui(
+        StubRoot(),
+        functional_tk_module,
+        functional_ttk_module,
+        stub_messagebox,
+        SimpleNamespace(askopenfilenames=lambda **_: ()),
+        project=project,
+    )
+    gui._apply_link_edit(
+        "L1",
+        type_value=LinkType.DEFINES.value,
+        tags_text="foo, bar",
+        note_text=" updated ",
+    )
+    entry = project.find_link_by_id("L1")
+    assert entry is not None
+    assert entry["type"] == LinkType.DEFINES.value
+    assert entry["tags"] == ["foo", "bar"]
+    assert entry["note"] == "updated"
+
+
+def test_apply_link_edit_rejects_unknown_type(
+    tmp_path: Path,
+    functional_tk_module: SimpleNamespace,
+    functional_ttk_module: SimpleNamespace,
+    stub_messagebox: StubMessageBox,
+) -> None:
+    project, _left_file, _right_file = _project_with_links(tmp_path)
+    gui = _make_gui(
+        StubRoot(),
+        functional_tk_module,
+        functional_ttk_module,
+        stub_messagebox,
+        SimpleNamespace(askopenfilenames=lambda **_: ()),
+        project=project,
+    )
+    gui._apply_link_edit("L1", type_value="unknown", tags_text="", note_text="")
+    assert "Unknown relationship type" in stub_messagebox.error_calls[-1][1]
+
+
+def test_load_target_into_viewer_requires_known_file(
+    tmp_path: Path,
+    functional_tk_module: SimpleNamespace,
+    functional_ttk_module: SimpleNamespace,
+    stub_messagebox: StubMessageBox,
+) -> None:
+    gui = _make_gui(
+        StubRoot(),
+        functional_tk_module,
+        functional_ttk_module,
+        stub_messagebox,
+        SimpleNamespace(askopenfilenames=lambda **_: ()),
+    )
+    assert gui._left_viewer is not None
+    with pytest.raises(ValueError, match="unknown file"):
+        gui._load_target_into_viewer(
+            gui._left_viewer, {"file_id": "missing"}, label="Left"
+        )
+
+
+def test_compute_target_hash_reports_missing_file(
+    tmp_path: Path,
+    functional_tk_module: SimpleNamespace,
+    functional_ttk_module: SimpleNamespace,
+    stub_messagebox: StubMessageBox,
+) -> None:
+    gui = _make_gui(
+        StubRoot(),
+        functional_tk_module,
+        functional_ttk_module,
+        stub_messagebox,
+        SimpleNamespace(askopenfilenames=lambda **_: ()),
+    )
+    missing = tmp_path / "missing.txt"
+    with pytest.raises(ValueError, match="does not exist"):
+        gui._compute_target_hash(str(missing), lines=None, label="source")
+
+
+def test_compute_target_hash_reports_invalid_range(
+    tmp_path: Path,
+    functional_tk_module: SimpleNamespace,
+    functional_ttk_module: SimpleNamespace,
+    stub_messagebox: StubMessageBox,
+) -> None:
+    source = tmp_path / "source.txt"
+    source.write_text("alpha\n")
+    gui = _make_gui(
+        StubRoot(),
+        functional_tk_module,
+        functional_ttk_module,
+        stub_messagebox,
+        SimpleNamespace(askopenfilenames=lambda **_: ()),
+    )
+    with pytest.raises(ValueError, match="Invalid line range"):
+        gui._compute_target_hash(str(source), lines=LineSpan(start=5), label="source")
+
+
+def test_compute_target_hash_reports_unicode_error(
+    tmp_path: Path,
+    functional_tk_module: SimpleNamespace,
+    functional_ttk_module: SimpleNamespace,
+    stub_messagebox: StubMessageBox,
+) -> None:
+    source = tmp_path / "binary.bin"
+    source.write_bytes(b"\xff\xfe")
+    gui = _make_gui(
+        StubRoot(),
+        functional_tk_module,
+        functional_ttk_module,
+        stub_messagebox,
+        SimpleNamespace(askopenfilenames=lambda **_: ()),
+    )
+    with pytest.raises(ValueError, match="not valid UTF-8"):
+        gui._compute_target_hash(str(source), lines=None, label="destination")
