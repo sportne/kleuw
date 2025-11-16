@@ -247,7 +247,7 @@
     },
     {
       "id": "T-014",
-      "status": "To Do",
+      "status": "complete",
       "title": "Implement basic GUI shell",
       "description": "In gui.py, create the Tkinter main window, menu bar, toolbar, files panel, link workspace shell, and status bar as described in the UI spec, with placeholder callbacks.",
       "depends_on": [
