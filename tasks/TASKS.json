@@ -282,7 +282,7 @@
     },
     {
       "id": "T-016",
-      "status": "To Do",
+      "status": "complete",
       "title": "Implement GUI line selection and relationship creation UI",
       "description": "Implement line-range selection in both viewers, relationship type combo box, swap button, and create-link button wiring to the underlying project/link creation logic.",
       "depends_on": [
