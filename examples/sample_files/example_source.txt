@@ -1,0 +1,3 @@
+ExampleWidget greets the user.
+It prints the onboarding message defined in the onboarding spec.
+The fallback path logs an audit entry for compliance.

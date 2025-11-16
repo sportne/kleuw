@@ -1,0 +1,68 @@
+{
+  "version": 1,
+  "metadata": {
+    "title": "Sample Kleuw project",
+    "description": "Demonstrates a fresh link and a stale link for documentation",
+    "author": "kleuw-examples"
+  },
+  "files": [
+    {
+      "id": "SRC",
+      "path": "examples/sample_files/example_source.txt",
+      "lang": "txt"
+    },
+    {
+      "id": "SPEC",
+      "path": "examples/sample_files/example_spec.md",
+      "lang": "md"
+    }
+  ],
+  "links": [
+    {
+      "id": "L1",
+      "type": "implements",
+      "src": {
+        "file_id": "SRC",
+        "lines": {"start": 1, "end": 2},
+        "src_region_hash": {
+          "algo": "sha256",
+          "value": "33b024d5f01459c549a43ce9080dc986d51baac457b26095762aac5239fbb292"
+        }
+      },
+      "dst": {
+        "file_id": "SPEC",
+        "lines": {"start": 1, "end": 2},
+        "dst_region_hash": {
+          "algo": "sha256",
+          "value": "157ec7d0c68f916426c7d9143c21227e9c34427ee5c0cb3381040c65c6cf64c7"
+        }
+      },
+      "directed": true,
+      "tags": ["example", "fresh"],
+      "note": "ExampleWidget lines 1-2 implement onboarding spec requirement 1"
+    },
+    {
+      "id": "L2",
+      "type": "documents",
+      "src": {
+        "file_id": "SRC",
+        "lines": {"start": 3, "end": 3},
+        "src_region_hash": {
+          "algo": "sha256",
+          "value": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        }
+      },
+      "dst": {
+        "path": "examples/sample_files/example_spec.md",
+        "lines": {"start": 3, "end": 3},
+        "dst_region_hash": {
+          "algo": "sha256",
+          "value": "812f1b18e5b376ed63b00109efc61fc321a317872c4ca046d4e8aaa13ba18378"
+        }
+      },
+      "directed": false,
+      "tags": ["example", "stale"],
+      "note": "Intentionally mismatched hash to demonstrate stale detection when source text changes"
+    }
+  ]
+}
