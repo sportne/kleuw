@@ -337,7 +337,7 @@
     },
     {
       "id": "T-019",
-      "status": "To Do",
+      "status": "complete",
       "title": "Add core unit tests for models and schema validation",
       "description": "Create tests for model creation, serialization/deserialization, and schema validation, ensuring invalid structures are properly reported.",
       "depends_on": [
@@ -358,7 +358,7 @@
     },
     {
       "id": "T-020",
-      "status": "To Do",
+      "status": "complete",
       "title": "Add unit tests for hashing and staleness logic",
       "description": "Create tests that cover the normalization rules, region hashing for various line ranges, and staleness determination cases (file missing, invalid range, hash mismatch).",
       "depends_on": [
@@ -377,7 +377,7 @@
     },
     {
       "id": "T-021",
-      "status": "To Do",
+      "status": "complete",
       "title": "Add unit tests for CLI commands",
       "description": "Write tests for the CLI using subprocess or Python-level invocation, verifying behavior of init, add-file, list, create-link, check, recompute, validate, and export commands.",
       "depends_on": [
@@ -398,7 +398,7 @@
     },
     {
       "id": "T-022",
-      "status": "To Do",
+      "status": "complete",
       "title": "Add basic GUI tests (headless-safe)",
       "description": "Implement a minimal set of GUI tests that can run in a headless environment where possible, and gracefully skip when Tk cannot initialize.",
       "depends_on": [
