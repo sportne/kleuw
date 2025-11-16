@@ -156,7 +156,7 @@
     },
     {
       "id": "T-009",
-      "status": "To Do",
+      "status": "complete",
       "title": "Implement CLI: init and add-file commands",
       "description": "Implement the behavior for `kleuw init` and `kleuw add-file` using the IO and project helpers. Ensure proper error reporting and JSON project initialization.",
       "depends_on": [

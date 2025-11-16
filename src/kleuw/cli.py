@@ -6,9 +6,16 @@ The CLI will eventually satisfy the workflow requirements described in
 
 from __future__ import annotations
 
+import sys
 from argparse import ArgumentParser, Namespace, _SubParsersAction
 from collections.abc import Callable, Sequence
+from pathlib import Path
 from typing import TYPE_CHECKING, cast
+
+from .hashing import compute_file_hash
+from .io import ProjectIOError, load_project, save_project
+from .model import FileEntry
+from .project import Project
 
 __all__ = ["build_parser", "main", "DEFAULT_PARSER"]
 
@@ -225,16 +232,92 @@ def _unimplemented(name: str) -> int:
     raise NotImplementedError(f"Command '{name}' is not implemented yet")
 
 
-def _handle_init(args: Namespace) -> int:
-    """Placeholder handler for the ``init`` subcommand."""
+def _print_error(message: str) -> None:
+    """Emit ``message`` to standard error with a consistent prefix."""
 
-    return _unimplemented("init")
+    print(f"Error: {message}", file=sys.stderr)
+
+
+def _generate_file_id(project: Project) -> str:
+    """Return the next available ``file-<n>`` identifier for ``project``."""
+
+    counter = 1
+    while True:
+        candidate = f"file-{counter}"
+        if not project.find_file_by_id(candidate):
+            return candidate
+        counter += 1
+
+
+def _handle_init(args: Namespace) -> int:
+    """Create a new Kleuw project JSON file."""
+
+    project_path = Path(args.project)
+    if project_path.exists() and not args.force:
+        _print_error(
+            f"Project file '{project_path}' already exists. Use --force to overwrite."
+        )
+        return 1
+
+    try:
+        project_path.parent.mkdir(parents=True, exist_ok=True)
+    except OSError as exc:
+        _print_error(f"Unable to create directory '{project_path.parent}': {exc}")
+        return 1
+
+    project = Project(version=1)
+    try:
+        save_project(project_path, project)
+    except ProjectIOError as exc:
+        _print_error(str(exc))
+        return 1
+    return 0
 
 
 def _handle_add_file(args: Namespace) -> int:
-    """Placeholder handler for the ``add-file`` subcommand."""
+    """Add a file entry to an existing Kleuw project."""
 
-    return _unimplemented("add-file")
+    project_path = Path(args.project)
+    try:
+        project = load_project(project_path)
+    except ProjectIOError as exc:
+        _print_error(str(exc))
+        return 1
+
+    file_path = Path(args.path)
+    if not file_path.is_file():
+        _print_error(f"File '{file_path}' does not exist or is not a file.")
+        return 1
+
+    file_id = args.file_id.strip() if args.file_id else None
+    if file_id is not None and not file_id:
+        _print_error("File id cannot be empty.")
+        return 1
+    if file_id is None:
+        file_id = _generate_file_id(project)
+
+    file_hash = None
+    if args.hash:
+        try:
+            file_hash = compute_file_hash(file_path)
+        except OSError as exc:
+            _print_error(f"Unable to hash file '{file_path}': {exc}")
+            return 1
+
+    entry = FileEntry(id=file_id, path=str(file_path), hash=file_hash)
+    try:
+        project.add_file(entry)
+    except ValueError as exc:
+        _print_error(str(exc))
+        return 1
+
+    try:
+        save_project(project_path, project)
+    except ProjectIOError as exc:
+        _print_error(str(exc))
+        return 1
+
+    return 0
 
 
 def _handle_list_files(args: Namespace) -> int:
