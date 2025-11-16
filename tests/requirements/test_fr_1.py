@@ -11,7 +11,6 @@ from kleuw.io import ProjectValidationError, load_project, save_project
 from kleuw.model import FileEntry, LineSpan, Link, LinkType, RegionHash, Target
 from kleuw.project import Project
 
-
 INVALID_PROJECT = {
     "version": 1,
     "files": [
@@ -53,8 +52,9 @@ def test_fr_1_load_and_save_round_trip(tmp_path: Path) -> None:
     """FR-1: kleuw shall load and save schema-compliant project files."""
 
     project = build_valid_project()
+
     source_path = tmp_path / "project.json"
-    source_path.write_text(json.dumps(project.to_dict()), encoding="utf-8")
+    save_project(source_path, project)
 
     loaded = load_project(source_path)
     assert loaded.to_dict() == project.to_dict()
@@ -62,8 +62,9 @@ def test_fr_1_load_and_save_round_trip(tmp_path: Path) -> None:
     target_path = tmp_path / "copy.json"
     save_project(target_path, loaded)
 
+    original_payload = json.loads(source_path.read_text(encoding="utf-8"))
     saved_payload = json.loads(target_path.read_text(encoding="utf-8"))
-    assert saved_payload == project.to_dict()
+    assert saved_payload == original_payload == project.to_dict()
 
 
 def test_fr_1_validation_enforced_for_load_and_save(tmp_path: Path) -> None:
@@ -72,9 +73,12 @@ def test_fr_1_validation_enforced_for_load_and_save(tmp_path: Path) -> None:
     invalid_path = tmp_path / "invalid.json"
     invalid_path.write_text(json.dumps(INVALID_PROJECT), encoding="utf-8")
 
-    with pytest.raises(ProjectValidationError):
+    with pytest.raises(ProjectValidationError) as load_exc:
         load_project(invalid_path)
+    assert invalid_path == load_exc.value.path
+    assert load_exc.value.errors, "Expected schema failures to be reported"
 
     project = Project(version=1, files=INVALID_PROJECT["files"], links=[])
-    with pytest.raises(ProjectValidationError):
+    with pytest.raises(ProjectValidationError) as save_exc:
         save_project(tmp_path / "invalid_save.json", project)
+    assert save_exc.value.errors, "Expected schema failures to be reported"
