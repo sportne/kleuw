@@ -416,7 +416,7 @@
     },
     {
       "id": "T-023",
-      "status": "To Do",
+      "status": "complete",
       "title": "Create example project and sample files",
       "description": "Populate the examples/ directory with a sample Kleuw project JSON and a small set of files demonstrating links, including stale and fresh relationships.",
       "depends_on": [
