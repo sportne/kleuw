@@ -133,21 +133,9 @@ def test_handle_init_requires_force_when_file_exists(tmp_path: Path, capsys) -> 
     assert project_path.read_text(encoding="utf-8") == "original"
 
 
-def _create_project(path: Path) -> None:
-    create_project(path)
-
-
-def _create_project_with_files(tmp_path: Path) -> tuple[Path, Path, Path]:
-    return create_project_with_files(tmp_path)
-
-
-def _create_project_with_links(tmp_path: Path) -> tuple[Path, Path, Path]:
-    return create_project_with_links(tmp_path)
-
-
 def test_handle_add_file_adds_entry_with_generated_id(tmp_path: Path) -> None:
     project_path = tmp_path / "project.json"
-    _create_project(project_path)
+    create_project(project_path)
     tracked_file = tmp_path / "tracked.txt"
     tracked_file.write_text("hello", encoding="utf-8")
 
@@ -167,7 +155,7 @@ def test_handle_add_file_adds_entry_with_generated_id(tmp_path: Path) -> None:
 
 def test_handle_add_file_supports_explicit_id_and_hash(tmp_path: Path) -> None:
     project_path = tmp_path / "project.json"
-    _create_project(project_path)
+    create_project(project_path)
     tracked_file = tmp_path / "tracked.txt"
     tracked_file.write_text("hash me", encoding="utf-8")
 
@@ -190,7 +178,7 @@ def test_handle_add_file_supports_explicit_id_and_hash(tmp_path: Path) -> None:
 
 def test_handle_add_file_rejects_missing_file(tmp_path: Path, capsys) -> None:
     project_path = tmp_path / "project.json"
-    _create_project(project_path)
+    create_project(project_path)
     missing_file = tmp_path / "missing.txt"
 
     exit_code = cli._handle_add_file(
@@ -251,7 +239,7 @@ def test_handle_list_files_supports_table_and_json(tmp_path: Path, capsys) -> No
 
 
 def test_handle_list_links_prints_table(tmp_path: Path, capsys) -> None:
-    project_path, _src_file, _dst_file = _create_project_with_links(tmp_path)
+    project_path, _src_file, _dst_file = create_project_with_links(tmp_path)
 
     exit_code = cli._handle_list_links(
         Namespace(
@@ -269,7 +257,7 @@ def test_handle_list_links_prints_table(tmp_path: Path, capsys) -> None:
 
 
 def test_handle_list_links_supports_json_and_filters(tmp_path: Path, capsys) -> None:
-    project_path, _src_file, _dst_file = _create_project_with_links(tmp_path)
+    project_path, _src_file, _dst_file = create_project_with_links(tmp_path)
 
     exit_code = cli._handle_list_links(
         Namespace(
@@ -286,7 +274,7 @@ def test_handle_list_links_supports_json_and_filters(tmp_path: Path, capsys) -> 
 
 
 def test_handle_create_link_adds_entry_and_prints_id(tmp_path: Path, capsys) -> None:
-    project_path, src_file, dst_file = _create_project_with_files(tmp_path)
+    project_path, src_file, dst_file = create_project_with_files(tmp_path)
 
     exit_code = cli._handle_create_link(
         Namespace(
@@ -318,7 +306,7 @@ def test_handle_create_link_adds_entry_and_prints_id(tmp_path: Path, capsys) -> 
 
 
 def test_handle_create_link_rejects_unknown_type(tmp_path: Path, capsys) -> None:
-    project_path, src_file, dst_file = _create_project_with_files(tmp_path)
+    project_path, src_file, dst_file = create_project_with_files(tmp_path)
 
     exit_code = cli._handle_create_link(
         Namespace(
@@ -336,7 +324,7 @@ def test_handle_create_link_rejects_unknown_type(tmp_path: Path, capsys) -> None
 
 
 def test_handle_create_link_reports_missing_source(tmp_path: Path, capsys) -> None:
-    project_path, _src_file, dst_file = _create_project_with_files(tmp_path)
+    project_path, _src_file, dst_file = create_project_with_files(tmp_path)
     missing_source = tmp_path / "missing.txt"
 
     exit_code = cli._handle_create_link(
@@ -355,7 +343,7 @@ def test_handle_create_link_reports_missing_source(tmp_path: Path, capsys) -> No
 
 
 def test_handle_check_reports_results_and_exit_codes(tmp_path: Path, capsys) -> None:
-    project_path, _src_file, _dst_file = _create_project_with_links(tmp_path)
+    project_path, _src_file, _dst_file = create_project_with_links(tmp_path)
 
     exit_code = cli._handle_check(
         Namespace(project=str(project_path), link_ids=None, json=False)
@@ -368,7 +356,7 @@ def test_handle_check_reports_results_and_exit_codes(tmp_path: Path, capsys) -> 
 
 
 def test_handle_check_supports_json_and_link_filter(tmp_path: Path, capsys) -> None:
-    project_path, _src_file, _dst_file = _create_project_with_links(tmp_path)
+    project_path, _src_file, _dst_file = create_project_with_links(tmp_path)
 
     exit_code = cli._handle_check(
         Namespace(project=str(project_path), link_ids=["L1"], json=True)
@@ -382,7 +370,7 @@ def test_handle_check_supports_json_and_link_filter(tmp_path: Path, capsys) -> N
 
 
 def test_handle_check_errors_on_unknown_link(tmp_path: Path, capsys) -> None:
-    project_path, _src_file, _dst_file = _create_project_with_links(tmp_path)
+    project_path, _src_file, _dst_file = create_project_with_links(tmp_path)
 
     exit_code = cli._handle_check(
         Namespace(project=str(project_path), link_ids=["missing"], json=False)
@@ -393,7 +381,7 @@ def test_handle_check_errors_on_unknown_link(tmp_path: Path, capsys) -> None:
 
 
 def test_handle_recompute_updates_hashes(tmp_path: Path, capsys) -> None:
-    project_path, src_file, _dst_file = _create_project_with_links(tmp_path)
+    project_path, src_file, _dst_file = create_project_with_links(tmp_path)
 
     exit_code = cli._handle_recompute(
         Namespace(project=str(project_path), link_ids=None)
@@ -416,7 +404,7 @@ def test_handle_recompute_updates_hashes(tmp_path: Path, capsys) -> None:
 
 def test_handle_validate_reports_success(tmp_path: Path, capsys) -> None:
     project_path = tmp_path / "project.json"
-    _create_project(project_path)
+    create_project(project_path)
 
     exit_code = cli._handle_validate(Namespace(project=str(project_path)))
 
@@ -437,7 +425,7 @@ def test_handle_validate_reports_schema_errors(tmp_path: Path, capsys) -> None:
 
 
 def test_handle_export_supports_json_and_stale_filter(tmp_path: Path, capsys) -> None:
-    project_path, _src_file, _dst_file = _create_project_with_links(tmp_path)
+    project_path, _src_file, _dst_file = create_project_with_links(tmp_path)
 
     exit_code = cli._handle_export(
         Namespace(project=str(project_path), format="json", stale=False)
@@ -461,7 +449,7 @@ def test_handle_export_supports_json_and_stale_filter(tmp_path: Path, capsys) ->
 
 
 def test_handle_export_supports_csv_and_text(tmp_path: Path, capsys) -> None:
-    project_path, _src_file, _dst_file = _create_project_with_links(tmp_path)
+    project_path, _src_file, _dst_file = create_project_with_links(tmp_path)
 
     exit_code = cli._handle_export(
         Namespace(project=str(project_path), format="csv", stale=False)

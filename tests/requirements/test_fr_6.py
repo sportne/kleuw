@@ -7,12 +7,8 @@ import pytest
 
 from kleuw.cli import _handle_add_file
 from kleuw.hashing import compute_file_hash
-from kleuw.io import load_project, save_project
-from kleuw.project import Project
-
-
-def _create_project(project_path: Path) -> None:
-    save_project(project_path, Project())
+from kleuw.io import load_project
+from tests.requirements._cli_helpers import create_project
 
 
 def test_fr_6_add_file_requires_existing_path(
@@ -22,7 +18,7 @@ def test_fr_6_add_file_requires_existing_path(
 
     project_path = tmp_path / "project.json"
     missing_path = tmp_path / "missing.txt"
-    _create_project(project_path)
+    create_project(project_path)
 
     exit_code = _handle_add_file(
         Namespace(
@@ -43,7 +39,7 @@ def test_fr_6_add_file_can_store_hash(tmp_path: Path) -> None:
     project_path = tmp_path / "project.json"
     tracked_path = tmp_path / "tracked.txt"
     tracked_path.write_text("hash me", encoding="utf-8")
-    _create_project(project_path)
+    create_project(project_path)
 
     exit_code = _handle_add_file(
         Namespace(
