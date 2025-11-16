@@ -1,5 +1,8 @@
 # Kleuw
 
+[![License: Apache 2.0](https://img.shields.io/badge/license-Apache%202.0-blue?style=flat-square)](LICENSE)
+[![CI](https://github.com/sportne/kleuw/actions/workflows/ci.yml/badge.svg)](https://github.com/sportne/kleuw/actions/workflows/ci.yml)
+
 Kleuw is a tool for capturing, managing, and validating semantic relationships between files — including line‑level links — and detecting staleness when linked regions change.
 
 This project offers both a **CLI** and a **Tkinter‑based GUI** for inspecting files side‑by‑side, selecting line ranges, and defining typed relationships.
