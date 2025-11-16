@@ -265,7 +265,7 @@
     },
     {
       "id": "T-015",
-      "status": "To Do",
+      "status": "complete",
       "title": "Implement GUI file loading and side-by-side viewers",
       "description": "Implement functionality to load files into left/right text viewers with line numbers, scrollbars, and basic navigation.",
       "depends_on": [

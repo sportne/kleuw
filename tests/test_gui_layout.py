@@ -3,61 +3,12 @@
 from __future__ import annotations
 
 from types import SimpleNamespace
-from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
 
 from kleuw.gui import KleuwGUI
-
-
-class StubStringVar:
-    """Minimal replacement for ``tkinter.StringVar``."""
-
-    def __init__(self, value: str = "") -> None:
-        self._value = value
-
-    def set(self, value: str) -> None:
-        self._value = value
-
-    def get(self) -> str:
-        return self._value
-
-
-class StubRoot:
-    """Headless replacement for ``tkinter.Tk``."""
-
-    def __init__(self) -> None:
-        self.config_kwargs: dict[str, Any] = {}
-        self.bindings: list[tuple[str, Any]] = []
-
-    def title(self, _title: str) -> None:  # pragma: no cover - trivial setter
-        return None
-
-    def geometry(self, _geometry: str) -> None:  # pragma: no cover - trivial setter
-        return None
-
-    def minsize(self, _width: int, _height: int) -> None:  # pragma: no cover
-        return None
-
-    def config(self, **kwargs: Any) -> None:
-        self.config_kwargs.update(kwargs)
-
-    def bind(self, sequence: str, handler: Any) -> None:
-        self.bindings.append((sequence, handler))
-
-    def mainloop(self) -> None:  # pragma: no cover - not exercised in tests
-        return None
-
-
-class StubMessageBox:
-    """Records invocations instead of showing dialogs."""
-
-    def __init__(self) -> None:
-        self.calls: list[tuple[str, str]] = []
-
-    def showinfo(self, *, title: str, message: str) -> None:
-        self.calls.append((title, message))
+from tests._gui_stubs import StubMessageBox, StubRoot, StubStringVar
 
 
 def _make_widget_factory(name: str) -> MagicMock:
@@ -80,6 +31,7 @@ def stub_tk_module() -> SimpleNamespace:
     module.HORIZONTAL = "horizontal"
     module.NONE = "none"
     module.DISABLED = "disabled"
+    module.NORMAL = "normal"
     module.SUNKEN = "sunken"
     module.Menu = _make_widget_factory("Menu")
     module.Listbox = _make_widget_factory("Listbox")
@@ -129,7 +81,7 @@ def test_gui_builds_layout_with_stubs(
     assert "menu" in root.config_kwargs
     gui._placeholder_action("Headless Test")
     assert gui.selection_var.get() == "Action requested: Headless Test"
-    assert stub_messagebox.calls[-1] == (
+    assert stub_messagebox.info_calls[-1] == (
         "Kleuw",
         "Headless Test is not implemented yet.",
     )
