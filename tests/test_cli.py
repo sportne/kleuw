@@ -10,8 +10,9 @@ from pathlib import Path
 import pytest
 
 from kleuw import cli
+from kleuw.hashing import compute_region_hash
 from kleuw.io import load_project, save_project
-from kleuw.model import FileEntry
+from kleuw.model import FileEntry, LineSpan, Link, LinkType, Target
 from kleuw.project import Project
 
 
@@ -129,6 +130,60 @@ def _create_project(path: Path) -> None:
     save_project(path, Project())
 
 
+def _create_project_with_links(tmp_path: Path) -> Path:
+    project_path = tmp_path / "project.json"
+    src_file = tmp_path / "src.txt"
+    src_file.write_text("alpha\nbeta\n", encoding="utf-8")
+    dst_file = tmp_path / "dst.txt"
+    dst_file.write_text("one\ntwo\n", encoding="utf-8")
+
+    project = Project()
+    project.add_file(FileEntry(id="file-1", path=str(src_file)))
+    project.add_file(FileEntry(id="file-2", path=str(dst_file)))
+
+    src_line1 = compute_region_hash(src_file, start_line=1, end_line=1)
+    src_line2 = compute_region_hash(src_file, start_line=2, end_line=2)
+    dst_line1 = compute_region_hash(dst_file, start_line=1, end_line=1)
+
+    project.add_link(
+        Link(
+            id="L1",
+            type=LinkType.IMPLEMENTS,
+            src=Target(
+                file_id="file-1",
+                lines=LineSpan(start=1, end=1),
+                region_hash=src_line1,
+            ),
+            dst=Target(
+                file_id="file-2",
+                lines=LineSpan(start=1, end=1),
+                region_hash=dst_line1,
+            ),
+        )
+    )
+    project.add_link(
+        Link(
+            id="L2",
+            type=LinkType.TESTS,
+            src=Target(
+                file_id="file-1",
+                lines=LineSpan(start=2, end=2),
+                region_hash=src_line2,
+            ),
+            dst=Target(
+                file_id="file-2",
+                lines=LineSpan(start=1, end=1),
+                region_hash=dst_line1,
+            ),
+        )
+    )
+
+    save_project(project_path, project)
+    # Modify the second line so only ``L2`` is stale.
+    src_file.write_text("alpha\nchanged\n", encoding="utf-8")
+    return project_path
+
+
 def test_handle_add_file_adds_entry_with_generated_id(tmp_path: Path) -> None:
     project_path = tmp_path / "project.json"
     _create_project(project_path)
@@ -209,3 +264,61 @@ def test_handle_add_file_rejects_duplicate_id(tmp_path: Path, capsys) -> None:
 
     assert exit_code == 1
     assert "already exists" in capsys.readouterr().err
+
+
+def test_handle_list_files_supports_table_and_json(tmp_path: Path, capsys) -> None:
+    project_path = tmp_path / "project.json"
+    tracked_file = tmp_path / "tracked.txt"
+    tracked_file.write_text("tracked", encoding="utf-8")
+    project = Project()
+    project.add_file(
+        FileEntry(id="file-1", path=str(tracked_file), lang="py", note="main")
+    )
+    save_project(project_path, project)
+
+    exit_code = cli._handle_list_files(Namespace(project=str(project_path), json=False))
+    assert exit_code == 0
+    output = capsys.readouterr().out
+    assert "ID" in output
+    assert "file-1" in output
+    assert "py" in output
+
+    exit_code = cli._handle_list_files(Namespace(project=str(project_path), json=True))
+    assert exit_code == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["files"][0]["id"] == "file-1"
+
+
+def test_handle_list_links_prints_table(tmp_path: Path, capsys) -> None:
+    project_path = _create_project_with_links(tmp_path)
+
+    exit_code = cli._handle_list_links(
+        Namespace(
+            project=str(project_path), json=False, stale_only=False, link_type=None
+        )
+    )
+
+    assert exit_code == 0
+    output = capsys.readouterr().out
+    assert "ID" in output
+    assert "L1" in output and "L2" in output
+    assert "file-1:1" in output
+    assert "file-1:2" in output
+    assert "yes" in output  # stale row is shown
+
+
+def test_handle_list_links_supports_json_and_filters(tmp_path: Path, capsys) -> None:
+    project_path = _create_project_with_links(tmp_path)
+
+    exit_code = cli._handle_list_links(
+        Namespace(
+            project=str(project_path),
+            json=True,
+            stale_only=True,
+            link_type=LinkType.TESTS.value,
+        )
+    )
+
+    assert exit_code == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert [link["id"] for link in payload["links"]] == ["L2"]

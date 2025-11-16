@@ -173,7 +173,7 @@
     },
     {
       "id": "T-010",
-      "status": "To Do",
+      "status": "complete",
       "title": "Implement CLI: list-files and list-links",
       "description": "Implement listing commands with both human-readable table output and optional --json output consistent with the schema.",
       "depends_on": [

@@ -6,16 +6,18 @@ The CLI will eventually satisfy the workflow requirements described in
 
 from __future__ import annotations
 
+import json
 import sys
 from argparse import ArgumentParser, Namespace, _SubParsersAction
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, Any, cast
 
 from .hashing import compute_file_hash
 from .io import ProjectIOError, load_project, save_project
-from .model import FileEntry
+from .model import FileEntry, HashDigest, LineSpan, Link, LinkType, RegionHash, Target
 from .project import Project
+from .staleness import check_link_staleness
 
 __all__ = ["build_parser", "main", "DEFAULT_PARSER"]
 
@@ -238,6 +240,174 @@ def _print_error(message: str) -> None:
     print(f"Error: {message}", file=sys.stderr)
 
 
+def _print_json(payload: Any) -> None:
+    """Pretty-print ``payload`` to standard output as JSON."""
+
+    print(json.dumps(payload, indent=2, sort_keys=True))
+
+
+def _format_optional(value: object | None) -> str:
+    """Return a placeholder when ``value`` is ``None`` or empty."""
+
+    if value is None:
+        return "-"
+    text = str(value)
+    return text if text.strip() else "-"
+
+
+def _format_hash(hash_value: object | None) -> str:
+    """Format ``hash_value`` into ``algo:value`` or ``-`` when missing."""
+
+    digest = _normalize_hash_object(hash_value)
+    if digest is None:
+        return "-"
+    algo, value = digest
+    return f"{algo}:{value}"
+
+
+def _print_table(headers: Sequence[str], rows: Sequence[Sequence[str]]) -> None:
+    """Render ``rows`` under ``headers`` in a simple fixed-width table."""
+
+    widths = [len(header) for header in headers]
+    for row in rows:
+        for index, cell in enumerate(row):
+            widths[index] = max(widths[index], len(cell))
+
+    header_line = "  ".join(
+        header.ljust(width) for header, width in zip(headers, widths, strict=False)
+    )
+    print(header_line)
+    for row in rows:
+        line = "  ".join(
+            cell.ljust(width) for cell, width in zip(row, widths, strict=False)
+        )
+        print(line)
+
+
+def _format_target(target: object | None) -> str:
+    """Render a ``target`` mapping into ``location[:lines]`` form."""
+
+    if not isinstance(target, Mapping):
+        return "-"
+    location = str(target.get("file_id") or target.get("path") or "-")
+    lines = target.get("lines")
+    if isinstance(lines, Mapping):
+        start = lines.get("start")
+        end = lines.get("end")
+        if isinstance(start, int):
+            line_suffix = f":{start}"
+            if isinstance(end, int):
+                line_suffix = f":{start}-{end}"
+            location = f"{location}{line_suffix}"
+    return location
+
+
+def _evaluate_link_staleness(
+    entry: Mapping[str, Any], *, file_lookup: Mapping[str, Mapping[str, Any]]
+) -> bool:
+    """Return ``True`` when ``entry`` represents a stale link."""
+
+    try:
+        link = _link_from_mapping(entry)
+    except ValueError:
+        return False
+    result = check_link_staleness(link, file_lookup=file_lookup)
+    return result.stale
+
+
+def _link_from_mapping(entry: Mapping[str, Any]) -> Link:
+    """Convert a serialized link mapping into a :class:`Link`."""
+
+    src_data = entry.get("src")
+    dst_data = entry.get("dst")
+    if not isinstance(src_data, Mapping) or not isinstance(dst_data, Mapping):
+        raise ValueError("Links must define 'src' and 'dst' targets.")
+    link_type = entry.get("type")
+    if link_type is None:
+        raise ValueError("Links must define a 'type'.")
+    tags = entry.get("tags") or ()
+    if isinstance(tags, str):
+        tags_value: Sequence[str] = (tags,)
+    else:
+        try:
+            tags_value = tuple(str(tag) for tag in tags)
+        except TypeError as exc:
+            raise ValueError("Link tags must be iterable.") from exc
+
+    directed = entry.get("directed")
+    directed_value = True if directed is None else bool(directed)
+    return Link(
+        id=str(entry.get("id", "")),
+        type=LinkType(link_type),
+        src=_target_from_mapping(src_data, region_key="src_region_hash"),
+        dst=_target_from_mapping(dst_data, region_key="dst_region_hash"),
+        directed=directed_value,
+        created=entry.get("created"),
+        author=entry.get("author"),
+        tags=tags_value,
+        note=entry.get("note"),
+    )
+
+
+def _target_from_mapping(target: Mapping[str, Any], *, region_key: str) -> Target:
+    """Convert serialized target mapping to :class:`Target`."""
+
+    file_id = target.get("file_id")
+    path = target.get("path")
+    lines = _line_span_from_mapping(target.get("lines"))
+    hash_data = target.get(region_key) or target.get("region_hash")
+    region_hash = _region_hash_from_mapping(hash_data) if hash_data else None
+    return Target(file_id=file_id, path=path, lines=lines, region_hash=region_hash)
+
+
+def _line_span_from_mapping(data: object | None) -> LineSpan | None:
+    """Convert a serialized line span to :class:`LineSpan`."""
+
+    if data is None:
+        return None
+    if isinstance(data, LineSpan):
+        return data
+    if not isinstance(data, Mapping):
+        raise ValueError("Line span must be a mapping.")
+    start = data.get("start")
+    end = data.get("end")
+    if not isinstance(start, int):
+        raise ValueError("Line span requires an integer 'start'.")
+    if end is not None and not isinstance(end, int):
+        raise ValueError("Line span 'end' must be an integer when provided.")
+    return LineSpan(start=start, end=end)
+
+
+def _region_hash_from_mapping(data: object) -> RegionHash:
+    """Convert ``data`` into a :class:`RegionHash`."""
+
+    if isinstance(data, RegionHash):
+        return data
+    if isinstance(data, HashDigest):
+        return RegionHash(algo=data.algo, value=data.value)
+    if isinstance(data, Mapping):
+        algo = data.get("algo")
+        value = data.get("value")
+        if isinstance(algo, str) and isinstance(value, str):
+            return RegionHash(algo=algo, value=value)
+    raise ValueError("Region hash must define 'algo' and 'value'.")
+
+
+def _normalize_hash_object(value: object | None) -> tuple[str, str] | None:
+    """Return a ``(algo, value)`` tuple for hash-like ``value``."""
+
+    if value is None:
+        return None
+    if isinstance(value, (HashDigest, RegionHash)):
+        return value.algo, value.value
+    if isinstance(value, Mapping):
+        algo = value.get("algo")
+        digest_value = value.get("value")
+        if isinstance(algo, str) and isinstance(digest_value, str):
+            return algo, digest_value
+    return None
+
+
 def _generate_file_id(project: Project) -> str:
     """Return the next available ``file-<n>`` identifier for ``project``."""
 
@@ -321,9 +491,37 @@ def _handle_add_file(args: Namespace) -> int:
 
 
 def _handle_list_files(args: Namespace) -> int:
-    """Placeholder handler for the ``list-files`` subcommand."""
+    """Display tracked files from the selected project."""
 
-    return _unimplemented("list-files")
+    project_path = Path(args.project)
+    try:
+        project = load_project(project_path)
+    except ProjectIOError as exc:
+        _print_error(str(exc))
+        return 1
+
+    if args.json:
+        _print_json({"files": project.files})
+        return 0
+
+    rows: list[list[str]] = []
+    for entry in project.files:
+        if not isinstance(entry, Mapping):
+            continue
+        rows.append(
+            [
+                str(entry.get("id", "")),
+                str(entry.get("path", "")),
+                _format_optional(entry.get("lang")),
+                _format_hash(entry.get("hash")),
+                _format_optional(entry.get("note")),
+            ]
+        )
+
+    _print_table(["ID", "PATH", "LANG", "HASH", "NOTE"], rows)
+    if not rows:
+        print("(no files)")
+    return 0
 
 
 def _handle_create_link(args: Namespace) -> int:
@@ -333,9 +531,61 @@ def _handle_create_link(args: Namespace) -> int:
 
 
 def _handle_list_links(args: Namespace) -> int:
-    """Placeholder handler for the ``list-links`` subcommand."""
+    """Display links from the selected project with optional filtering."""
 
-    return _unimplemented("list-links")
+    project_path = Path(args.project)
+    try:
+        project = load_project(project_path)
+    except ProjectIOError as exc:
+        _print_error(str(exc))
+        return 1
+
+    link_entries: list[dict[str, Any]] = []
+    for entry in project.links:
+        if not isinstance(entry, Mapping):
+            continue
+        if args.link_type and str(entry.get("type")) != args.link_type:
+            continue
+        link_entries.append(entry)
+
+    file_lookup = {
+        str(entry["id"]): entry
+        for entry in project.files
+        if isinstance(entry, Mapping) and "id" in entry
+    }
+
+    annotated: list[tuple[dict[str, Any], bool]] = []
+    for entry in link_entries:
+        result = _evaluate_link_staleness(entry, file_lookup=file_lookup)
+        if args.stale_only and not result:
+            continue
+        annotated.append((entry, bool(result)))
+
+    if args.json:
+        _print_json({"links": [entry for entry, _ in annotated]})
+        return 0
+
+    rows: list[list[str]] = []
+    for entry, is_stale in annotated:
+        rows.append(
+            [
+                str(entry.get("id", "")),
+                str(entry.get("type", "")),
+                _format_target(entry.get("src")),
+                _format_target(entry.get("dst")),
+                "yes" if is_stale else "no",
+                (
+                    ",".join(str(tag) for tag in entry.get("tags", []))
+                    if entry.get("tags")
+                    else "-"
+                ),
+            ]
+        )
+
+    _print_table(["ID", "TYPE", "SRC", "DST", "STALE", "TAGS"], rows)
+    if not rows:
+        print("(no links)")
+    return 0
 
 
 def _handle_check(args: Namespace) -> int:
