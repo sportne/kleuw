@@ -1,9 +1,9 @@
 # Kleuw
 
-[![CI](https://img.shields.io/badge/CI-make%20ci-blue?style=flat-square)](#running-all-checks)
-[![Coverage](https://img.shields.io/badge/coverage-%E2%89%A580%25-brightgreen?style=flat-square)](#running-all-checks)
-[![Python](https://img.shields.io/badge/python-3.10+-blue?style=flat-square)](pyproject.toml)
-[![License](https://img.shields.io/badge/license-Proprietary-orange?style=flat-square)](LICENSE)
+[![License: Apache 2.0](https://img.shields.io/badge/license-Apache%202.0-blue?style=flat-square)](LICENSE)
+![Build Status](https://img.shields.io/badge/build-make%20ci%20passing-4c1?style=flat-square)
+![Coverage](https://img.shields.io/badge/coverage-80.3%25-yellowgreen?style=flat-square)
+![Static Analysis](https://img.shields.io/badge/static%20analysis-ruff%20%2B%20mypy%20clean-4c1?style=flat-square)
 
 Kleuw is a tool for capturing, managing, and validating semantic relationships between files — including line‑level links — and detecting staleness when linked regions change.
 
