@@ -216,6 +216,7 @@ class KleuwGUI:
         self._right_viewer: ViewerPane | None = None
         self.relationship_var = self._tk.StringVar(value="")
         self._create_link_button: Any | None = None
+        self._links_tree: Any | None = None
 
         style = self._ttk.Style()
         style.configure("Tooltip.TLabel", background="#ffffe0")
@@ -439,15 +440,29 @@ class KleuwGUI:
         tree.configure(yscrollcommand=y_scroll.set)
         tree.pack(fill=self._tk.BOTH, expand=True, side=self._tk.LEFT, pady=(4, 0))
         y_scroll.pack(fill=self._tk.Y, side=self._tk.RIGHT, pady=(4, 0))
-        tree.insert(
-            "",
-            self._tk.END,
-            values=("L-001", "implements", "src", "dst", "No", "", ""),
-        )
         tree.bind(
             "<Double-1>",
-            lambda _event: self._placeholder_action("Navigate to link"),
+            lambda _event: self._navigate_to_selected_link(),
         )
+        tree.bind(
+            "<Button-3>",
+            lambda event: self._show_links_context_menu(event, tree),
+        )
+        self._links_tree = tree
+
+        button_row = self._ttk.Frame(parent, padding=(0, 8, 0, 0))
+        button_row.pack(fill=self._tk.X)
+        self._ttk.Button(
+            button_row,
+            text="Edit Link",
+            command=self._edit_selected_link,
+        ).pack(side=self._tk.LEFT, padx=(0, 4))
+        self._ttk.Button(
+            button_row,
+            text="Delete Link",
+            command=self._delete_selected_links,
+        ).pack(side=self._tk.LEFT)
+        self._refresh_links_panel()
 
     def _build_status_bar(self) -> None:
         bar = self._ttk.Frame(self.root, relief=self._tk.SUNKEN, padding=(8, 4))
@@ -905,7 +920,255 @@ class KleuwGUI:
             self._messagebox.showerror(title="Kleuw", message=str(exc))
             return
         self.dirty_var.set("● Unsaved changes")
+        self._refresh_links_panel(selected_id=link.id)
         self._update_create_button_state()
+
+    # ------------------------------------------------------------------
+    # Links panel helpers
+    # ------------------------------------------------------------------
+    def _refresh_links_panel(self, *, selected_id: str | None = None) -> None:
+        if self._links_tree is None:
+            return
+        tree = self._links_tree
+        for item in tree.get_children():
+            tree.delete(item)
+        for link in self._project.links:
+            link_id = str(link.get("id", ""))
+            values = (
+                link_id,
+                str(link.get("type", "")),
+                self._format_target(link.get("src", {})),
+                self._format_target(link.get("dst", {})),
+                "No",
+                ", ".join(link.get("tags", [])) if link.get("tags") else "",
+                "Yes" if link.get("note") else "",
+            )
+            tree.insert("", self._tk.END, iid=link_id, values=values)
+        if selected_id is not None:
+            try:
+                tree.selection_set(selected_id)
+            except Exception:  # pragma: no cover - Tk fallback
+                pass
+
+    def _format_target(self, target: Any) -> str:
+        if not isinstance(target, dict):
+            return ""
+        path = self._resolve_target_path(target)
+        if path is None:
+            return ""
+        lines = target.get("lines")
+        if isinstance(lines, dict):
+            start = lines.get("start")
+            end = lines.get("end")
+            if isinstance(start, int):
+                if isinstance(end, int) and end != start:
+                    return f"{path} L{start}–L{end}"
+                return f"{path} L{start}"
+        return path
+
+    def _show_links_context_menu(self, event: Any, tree: Any) -> None:
+        menu = self._tk.Menu(self.root, tearoff=False)
+        menu.add_command(label="Open", command=self._navigate_to_selected_link)
+        menu.add_command(label="Edit", command=self._edit_selected_link)
+        menu.add_command(label="Delete", command=self._delete_selected_links)
+        try:
+            menu.tk_popup(event.x_root, event.y_root)
+        finally:  # pragma: no cover - Tk handles grab release
+            menu.grab_release()
+
+    def _navigate_to_selected_link(self) -> None:
+        if self._links_tree is None:
+            return
+        selection = self._links_tree.selection()
+        if not selection:
+            return
+        self._navigate_to_link_id(str(selection[0]))
+
+    def _navigate_to_link_id(self, link_id: str) -> None:
+        link_entry = self._project.find_link_by_id(link_id)
+        if link_entry is None:
+            self._messagebox.showerror(
+                title="Kleuw", message=f"Link '{link_id}' no longer exists."
+            )
+            return
+        if self._left_viewer is None or self._right_viewer is None:
+            return
+        self.relationship_var.set(str(link_entry.get("type", "")))
+        try:
+            self._load_target_into_viewer(
+                self._left_viewer, link_entry.get("src", {}), label="Left"
+            )
+            self._load_target_into_viewer(
+                self._right_viewer, link_entry.get("dst", {}), label="Right"
+            )
+        except ValueError as exc:
+            self._messagebox.showerror(title="Kleuw", message=str(exc))
+
+    def _load_target_into_viewer(
+        self,
+        viewer: ViewerPane,
+        target: Any,
+        *,
+        label: str,
+    ) -> None:
+        if not isinstance(target, dict):
+            raise ValueError("Link target is malformed.")
+        path = self._resolve_target_path(target)
+        if path is None:
+            raise ValueError("Link target references an unknown file.")
+        self._load_file_into_viewer(viewer, path)
+        lines = target.get("lines")
+        start_line: int | None = None
+        end_line: int | None = None
+        if isinstance(lines, dict) and "start" in lines:
+            start_value = lines.get("start")
+            end_value = lines.get("end")
+            start_line = start_value if isinstance(start_value, int) else None
+            if isinstance(end_value, int):
+                end_line = end_value
+        self._set_viewer_selection(viewer, start_line, end_line)
+        if start_line is not None:
+            self._scroll_viewer_to_line(viewer, start_line)
+        else:
+            self.selection_var.set(f"Loaded {Path(path).name} into {label}")
+
+    def _scroll_viewer_to_line(self, viewer: ViewerPane, line_number: int) -> None:
+        line = self._clamp_line(viewer, line_number)
+        try:
+            viewer.text_widget.see(f"{line}.0")
+        except Exception:  # pragma: no cover - depends on Tk
+            return
+
+    def _resolve_target_path(self, target: dict[str, Any]) -> str | None:
+        path_value = target.get("path")
+        if isinstance(path_value, str) and path_value:
+            return path_value
+        file_id = target.get("file_id")
+        if isinstance(file_id, str) and file_id:
+            file_entry = self._project.find_file_by_id(file_id)
+            if isinstance(file_entry, dict):
+                candidate = file_entry.get("path")
+                if isinstance(candidate, str) and candidate:
+                    return candidate
+        return None
+
+    def _delete_selected_links(self) -> None:
+        if self._links_tree is None:
+            return
+        selection = self._links_tree.selection()
+        removed = False
+        for item_id in selection:
+            link_id = str(item_id)
+            if self._project.remove_link(link_id) is not None:
+                removed = True
+        if removed:
+            self.dirty_var.set("● Unsaved changes")
+            self._refresh_links_panel()
+
+    def _edit_selected_link(self) -> None:
+        if self._links_tree is None:
+            return
+        selection = self._links_tree.selection()
+        if not selection:
+            return
+        link_id = str(selection[0])
+        link_entry = self._project.find_link_by_id(link_id)
+        if link_entry is None:
+            self._messagebox.showerror(
+                title="Kleuw", message=f"Link '{link_id}' no longer exists."
+            )
+            return
+        self._open_edit_dialog(link_entry)
+
+    def _open_edit_dialog(self, link_entry: dict[str, Any]) -> None:
+        dialog = self._tk.Toplevel(self.root)
+        dialog.title(f"Edit Link {link_entry.get('id', '')}")
+        dialog.transient(self.root)
+        dialog.grab_set()
+        content = self._ttk.Frame(dialog, padding=12)
+        content.pack(fill=self._tk.BOTH, expand=True)
+
+        type_var = self._tk.StringVar(value=str(link_entry.get("type", "")))
+        tags_var = self._tk.StringVar(value=", ".join(link_entry.get("tags", [])))
+        note_var = self._tk.StringVar(value=str(link_entry.get("note", "")))
+
+        self._ttk.Label(content, text="Relationship Type:").grid(
+            row=0, column=0, sticky=self._tk.W
+        )
+        type_combo = self._ttk.Combobox(
+            content,
+            textvariable=type_var,
+            values=self._relationship_values,
+            state="readonly",
+            width=25,
+        )
+        type_combo.grid(row=0, column=1, sticky=self._tk.W, pady=4)
+
+        self._ttk.Label(content, text="Tags:").grid(row=1, column=0, sticky=self._tk.W)
+        tags_entry = self._ttk.Entry(content, textvariable=tags_var, width=40)
+        tags_entry.grid(row=1, column=1, sticky=self._tk.W, pady=4)
+
+        self._ttk.Label(content, text="Note:").grid(row=2, column=0, sticky=self._tk.W)
+        note_entry = self._ttk.Entry(content, textvariable=note_var, width=40)
+        note_entry.grid(row=2, column=1, sticky=self._tk.W, pady=4)
+
+        button_row = self._ttk.Frame(content)
+        button_row.grid(row=3, column=0, columnspan=2, pady=(8, 0))
+
+        def _save() -> None:
+            self._apply_link_edit(
+                str(link_entry.get("id", "")),
+                type_value=type_var.get(),
+                tags_text=tags_var.get(),
+                note_text=note_var.get(),
+            )
+            dialog.destroy()
+
+        def _cancel() -> None:
+            dialog.destroy()
+
+        self._ttk.Button(button_row, text="Save", command=_save).pack(
+            side=self._tk.LEFT, padx=(0, 4)
+        )
+        self._ttk.Button(button_row, text="Cancel", command=_cancel).pack(
+            side=self._tk.LEFT
+        )
+        tags_entry.focus_set()
+
+    def _apply_link_edit(
+        self,
+        link_id: str,
+        *,
+        type_value: str,
+        tags_text: str,
+        note_text: str,
+    ) -> None:
+        link_entry = self._project.find_link_by_id(link_id)
+        if link_entry is None:
+            self._messagebox.showerror(
+                title="Kleuw", message=f"Link '{link_id}' no longer exists."
+            )
+            return
+        try:
+            normalized_type = LinkType(type_value).value
+        except ValueError:
+            self._messagebox.showerror(
+                title="Kleuw", message=f"Unknown relationship type '{type_value}'."
+            )
+            return
+        link_entry["type"] = normalized_type
+        tags = [tag.strip() for tag in tags_text.split(",") if tag.strip()]
+        if tags:
+            link_entry["tags"] = tags
+        elif "tags" in link_entry:
+            del link_entry["tags"]
+        note = note_text.strip()
+        if note:
+            link_entry["note"] = note
+        elif "note" in link_entry:
+            del link_entry["note"]
+        self.dirty_var.set("● Unsaved changes")
+        self._refresh_links_panel(selected_id=link_id)
 
     def run(self) -> None:
         """Start the Tkinter main loop."""

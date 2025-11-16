@@ -301,7 +301,7 @@
     },
     {
       "id": "T-017",
-      "status": "To Do",
+      "status": "complete",
       "title": "Implement GUI links panel and navigation to linked regions",
       "description": "Implement a tabular links panel, enabling selection of a link to load corresponding files and scroll to their line ranges. Support delete and edit operations.",
       "depends_on": [
