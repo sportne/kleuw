@@ -16,6 +16,12 @@ The GUI enables users to:
 
 This document guides implementation but includes **no code**.
 
+### Implementation Notes
+
+* `KleuwGUI` is initialized with an in-memory `Project` object. Loading/saving JSON files is performed externally (typically through the CLI) and is not yet wired to the GUI.
+* Menu and toolbar commands other than “Create Link” and “Check Staleness” currently display placeholder dialogs stating that the action is not implemented.
+* The Files panel maintains its own list of convenient file paths for the viewers; it does not mutate the project’s `files[]` entries.
+
 ---
 
 ## 2. Top-Level UI Layout
@@ -89,6 +95,10 @@ Status Bar (project path, dirty flag, selection summary)
 * About
 * Keyboard Shortcuts
 
+Except for the “Create Link” and “Check Staleness” actions under the **Links** menu,
+all items currently trigger a placeholder dialog informing the user that the
+feature is not yet implemented.
+
 ---
 
 ## 4. Toolbar
@@ -103,6 +113,11 @@ The toolbar contains quick-access buttons:
 * **Create Link** – create a new link from current selections
 
 Buttons should provide tooltips.
+
+Implementation status:
+
+* “Add File”, “Remove File”, “Open Left”, “Open Right”, “Create Link”, and “Check Staleness” execute real callbacks.
+* The remaining toolbar buttons share the same placeholders as their menu counterparts until persistence is implemented.
 
 ---
 
@@ -119,11 +134,9 @@ A left-side vertical panel showing the project’s known files:
 
 * Double-click a file to open it in the Left viewer
 * Shift+Double-click to open in the Right viewer
-* Context menu:
-
-  * Open in Left Viewer
-  * Open in Right Viewer
-  * Remove File
+* Buttons provide explicit **Add File**, **Remove File**, **Open Left**, and **Open Right** actions
+* “Add File” uses the platform file dialog to append normalized paths (duplicates are ignored)
+* Removing a file only affects the panel’s local list and does not touch the project’s tracked files
 
 ---
 
@@ -174,6 +187,11 @@ Swaps Left and Right file assignments (both file and selection).
   * region hashes
 * Adds link to Links Panel
 
+Implementation detail: when the selected file path matches an entry inside
+`project.files`, the resulting link stores the `file_id`; otherwise the absolute
+path is embedded directly in the link target. Region hashes are computed using
+the same normalization rules as the CLI.
+
 ---
 
 ## 7. Links Panel
@@ -195,11 +213,14 @@ A table listing all existing links with columns:
 
   * Edit Link
   * Delete Link
-  * Recompute Hashes
-  * Copy as JSON
-  * Copy as text reference (`path#Lstart-Lend`)
+  * (Open) Load the linked files into the viewers
 
-Rows are highlighted if a link is stale.
+Rows are highlighted if a link is stale. A “Show All” button becomes enabled
+after filtering to stale links so users can return to the full list.
+
+Selecting “Edit Link” opens a modal dialog containing a relationship-type combo
+box plus free-form fields for tags (comma separated) and notes. Saving updates
+the in-memory link entry, refreshes the table, and sets the dirty indicator.
 
 ---
 
@@ -209,6 +230,10 @@ Rows are highlighted if a link is stale.
 
 * Stale links displayed with yellow background
 * Tooltip shows which side changed (src/dst)
+
+Implementation detail: the GUI reuses `staleness.check_link_staleness` so the
+results match the CLI exactly. The computed results are cached until the next
+staleness run and power both row highlighting and the stale filter.
 
 ### 8.2 Staleness Checking
 
@@ -247,34 +272,29 @@ Displays:
 
 ## 10. Keyboard Shortcuts
 
-* Ctrl+N – New Project
-* Ctrl+O – Open Project
-* Ctrl+S – Save Project
-* Ctrl+Enter – Create Link
-* Ctrl+K – Check Staleness
-* Ctrl++ / Ctrl+- – Increase/Decrease font size
-* Alt+W – Toggle wrapping
-* Esc – Clear selections
+* Ctrl+Enter – Create Link (real action)
+* Ctrl+K – Check Staleness (real action)
+* Esc – Clear selections (real action)
+* Ctrl+N / Ctrl+O / Ctrl+S / Ctrl++ / Ctrl+- / Alt+W – currently display placeholder dialogs until persistence and view settings are implemented
 
 ---
 
 ## 11. Error Handling
 
-* Display modal dialogs for:
+* Display modal dialogs when:
 
-  * Corrupt project file
-  * Missing file on disk
-  * Unsupported encoding
-* Non-blocking toast messages in status bar for minor issues
+  * A file selected in the Files panel cannot be opened or decoded
+  * Hash computation fails because the file or range is invalid
+  * Users attempt an action (create link, open viewer) without the necessary selections
+* Informational status-bar messages summarize successful operations (e.g., file loads)
 
 ---
 
-## 12. Preferences (Minimal for v1)
+## 12. Preferences (Deferred)
 
-* Default font size
-* Default relationship type ordering
-* Show/hide line numbers
-* Line wrapping default
+The menu entry is present for parity with the specification but currently shows
+a placeholder dialog. Preference management (font size, relationship ordering,
+line numbers, wrapping defaults) remains a future enhancement.
 
 ---
 
@@ -283,6 +303,10 @@ Displays:
 * Keyboard navigation supports all actions
 * Adjustable text size
 * High contrast mode toggle
+
+Current implementation relies on Tkinter defaults for keyboard focus and does
+not yet expose a dedicated high-contrast toggle; these remain future
+improvements alongside the deferred preference dialog.
 
 ---
 

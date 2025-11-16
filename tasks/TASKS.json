@@ -438,7 +438,7 @@
     },
     {
       "id": "T-024",
-      "status": "To Do",
+      "status": "complete",
       "title": "Align documentation with implementation",
       "description": "Review the spec documents (requirements, schema, CLI, UI, staleness) and update them to reflect any implementation decisions or deviations discovered during development.",
       "depends_on": [
