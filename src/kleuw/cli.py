@@ -6,14 +6,17 @@ The CLI will eventually satisfy the workflow requirements described in
 
 from __future__ import annotations
 
+import csv
 import json
 import re
 import sys
 from argparse import ArgumentParser, Namespace, _SubParsersAction
 from collections.abc import Callable, Mapping, Sequence
+from copy import deepcopy
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
+from . import schema
 from .hashing import compute_file_hash, compute_region_hash
 from .io import ProjectIOError, load_project, save_project
 from .model import FileEntry, HashDigest, LineSpan, Link, LinkType, RegionHash, Target
@@ -229,12 +232,6 @@ def _add_export_parser(subparsers: SubparserCollection) -> None:
         help="Only include stale links in the export",
     )
     parser.set_defaults(handler=_handle_export)
-
-
-def _unimplemented(name: str) -> int:
-    """Raise the standard placeholder exception for unimplemented commands."""
-
-    raise NotImplementedError(f"Command '{name}' is not implemented yet")
 
 
 def _print_error(message: str) -> None:
@@ -454,6 +451,173 @@ def _format_reasons(reasons: Sequence[str]) -> str:
     if not reasons:
         return "-"
     return "; ".join(reasons)
+
+
+def _annotate_links_with_staleness(
+    project: Project,
+) -> list[tuple[dict[str, Any], LinkStalenessResult]]:
+    """Return ``project`` links paired with their staleness results."""
+
+    file_lookup = _build_file_lookup(project)
+    annotated: list[tuple[dict[str, Any], LinkStalenessResult]] = []
+    for entry in project.links:
+        if not isinstance(entry, dict):
+            continue
+        entry_dict = entry
+        try:
+            link = _link_from_mapping(entry_dict)
+        except ValueError as exc:
+            identifier = entry_dict.get("id")
+            label = f"link '{identifier}'" if identifier else "link"
+            raise ValueError(f"Invalid {label}: {exc}") from exc
+        result = check_link_staleness(link, file_lookup=file_lookup)
+        annotated.append((entry_dict, result))
+    return annotated
+
+
+def _link_entry_with_staleness(
+    entry: Mapping[str, Any], result: LinkStalenessResult
+) -> dict[str, Any]:
+    """Return a deep-copied ``entry`` annotated with staleness metadata."""
+
+    payload = deepcopy(dict(entry))
+    payload["stale"] = result.stale
+    if result.reasons:
+        payload["stale_reasons"] = list(result.reasons)
+    elif "stale_reasons" in payload:
+        del payload["stale_reasons"]
+    return payload
+
+
+def _export_as_json(
+    files: Sequence[Mapping[str, Any]],
+    links: Sequence[tuple[Mapping[str, Any], LinkStalenessResult]],
+    *,
+    total_links: int,
+    stale_links: int,
+    exported_links: int,
+) -> None:
+    """Emit a JSON payload describing the exported project data."""
+
+    payload = {
+        "files": deepcopy(list(files)),
+        "links": [_link_entry_with_staleness(entry, result) for entry, result in links],
+        "summary": {
+            "files": len(files),
+            "links": total_links,
+            "stale_links": stale_links,
+            "exported_links": exported_links,
+        },
+    }
+    _print_json(payload)
+
+
+def _export_as_csv(
+    files: Sequence[Mapping[str, Any]],
+    links: Sequence[tuple[Mapping[str, Any], LinkStalenessResult]],
+) -> None:
+    """Emit CSV rows covering files and link staleness details."""
+
+    writer = csv.writer(sys.stdout)
+    writer.writerow(
+        [
+            "section",
+            "id",
+            "path",
+            "lang",
+            "note",
+            "hash",
+            "type",
+            "src",
+            "dst",
+            "stale",
+            "reasons",
+        ]
+    )
+    for entry in files:
+        writer.writerow(
+            [
+                "file",
+                str(entry.get("id", "")),
+                str(entry.get("path", "")),
+                _format_optional(entry.get("lang")),
+                _format_optional(entry.get("note")),
+                _format_hash(entry.get("hash")),
+                "",
+                "",
+                "",
+                "",
+                "",
+            ]
+        )
+    for entry, result in links:
+        writer.writerow(
+            [
+                "link",
+                str(entry.get("id", "")),
+                "",
+                "",
+                "",
+                "",
+                str(entry.get("type", "")),
+                _format_target(entry.get("src")),
+                _format_target(entry.get("dst")),
+                "yes" if result.stale else "no",
+                _format_reasons(result.reasons),
+            ]
+        )
+
+
+def _export_as_text(
+    files: Sequence[Mapping[str, Any]],
+    links: Sequence[tuple[Mapping[str, Any], LinkStalenessResult]],
+    *,
+    total_links: int,
+    stale_links: int,
+    stale_only: bool,
+) -> None:
+    """Emit human-readable tables describing files and links."""
+
+    file_rows: list[list[str]] = []
+    for entry in files:
+        file_rows.append(
+            [
+                str(entry.get("id", "")),
+                str(entry.get("path", "")),
+                _format_optional(entry.get("lang")),
+                _format_hash(entry.get("hash")),
+                _format_optional(entry.get("note")),
+            ]
+        )
+
+    print("Files:")
+    _print_table(["ID", "PATH", "LANG", "HASH", "NOTE"], file_rows)
+    if not file_rows:
+        print("(no files)")
+    print()
+
+    link_rows: list[list[str]] = []
+    for entry, result in links:
+        link_rows.append(
+            [
+                str(entry.get("id", "")),
+                str(entry.get("type", "")),
+                _format_target(entry.get("src")),
+                _format_target(entry.get("dst")),
+                "STALE" if result.stale else "OK",
+                _format_reasons(result.reasons),
+            ]
+        )
+
+    print("Links:")
+    _print_table(["ID", "TYPE", "SRC", "DST", "STATUS", "DETAILS"], link_rows)
+    if not link_rows:
+        print("(no links)")
+    print()
+
+    print(f"Total links: {total_links}")
+    print(f"Stale links: {stale_links}")
+    print(f"Exported links: {len(links)}" + (" (stale only)" if stale_only else ""))
 
 
 def _resolve_target_path_entry(
@@ -1019,15 +1183,81 @@ def _handle_recompute(args: Namespace) -> int:
 
 
 def _handle_validate(args: Namespace) -> int:
-    """Placeholder handler for the ``validate`` subcommand."""
+    """Validate the selected project file against the Kleuw schema."""
 
-    return _unimplemented("validate")
+    project_path = Path(args.project)
+    try:
+        with project_path.open("r", encoding="utf-8") as handle:
+            payload = json.load(handle)
+    except FileNotFoundError:
+        _print_error(f"Project file '{project_path}' does not exist.")
+        return 1
+    except json.JSONDecodeError as exc:
+        _print_error(
+            f"Project file '{project_path}' contains invalid JSON: "
+            f"{exc.msg} (line {exc.lineno}, column {exc.colno})."
+        )
+        return 1
+    except OSError as exc:
+        _print_error(f"Unable to read project file '{project_path}': {exc}")
+        return 1
+
+    errors = schema.validate_project(payload)
+    if errors:
+        _print_error("Project validation failed.")
+        for message in errors:
+            print(f"  - {message}", file=sys.stderr)
+        return 1
+
+    file_count = len(payload.get("files", [])) if isinstance(payload, Mapping) else 0
+    link_count = len(payload.get("links", [])) if isinstance(payload, Mapping) else 0
+    print(f"Project is valid ({file_count} files, {link_count} links).")
+    return 0
 
 
 def _handle_export(args: Namespace) -> int:
-    """Placeholder handler for the ``export`` subcommand."""
+    """Export project contents and staleness data in the selected format."""
 
-    return _unimplemented("export")
+    project_path = Path(args.project)
+    try:
+        project = load_project(project_path)
+    except ProjectIOError as exc:
+        _print_error(str(exc))
+        return 1
+
+    file_entries: list[dict[str, Any]] = [
+        entry for entry in project.files if isinstance(entry, dict)
+    ]
+    try:
+        annotated = _annotate_links_with_staleness(project)
+    except ValueError as exc:
+        _print_error(str(exc))
+        return 1
+
+    total_links = len(annotated)
+    stale_links = sum(1 for _entry, result in annotated if result.stale)
+    selected = [item for item in annotated if not args.stale or item[1].stale]
+
+    if args.format == "json":
+        _export_as_json(
+            file_entries,
+            selected,
+            total_links=total_links,
+            stale_links=stale_links,
+            exported_links=len(selected),
+        )
+    elif args.format == "csv":
+        _export_as_csv(file_entries, selected)
+    else:
+        _export_as_text(
+            file_entries,
+            selected,
+            total_links=total_links,
+            stale_links=stale_links,
+            stale_only=bool(args.stale),
+        )
+
+    return 0
 
 
 DEFAULT_PARSER: ArgumentParser = build_parser()

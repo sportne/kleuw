@@ -228,7 +228,7 @@
     },
     {
       "id": "T-013",
-      "status": "To Do",
+      "status": "complete",
       "title": "Implement CLI: validate and export",
       "description": "Implement the `validate` and `export` commands to check project structure and produce summaries (JSON, CSV, text).",
       "depends_on": [
