@@ -209,7 +209,7 @@
     },
     {
       "id": "T-012",
-      "status": "To Do",
+      "status": "complete",
       "title": "Implement CLI: check and recompute",
       "description": "Implement the `check` command to run staleness detection and the `recompute` command to update stored region hashes as a new baseline, including appropriate exit codes and JSON output.",
       "depends_on": [
