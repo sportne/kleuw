@@ -17,6 +17,7 @@ from typing import Any
 
 from kleuw.hashing import compute_region_hash
 from kleuw.model import HashDigest, LineSpan, Link, LinkType, RegionHash, Target
+from kleuw.io import load_project, save_project
 from kleuw.project import Project
 from kleuw.staleness import LinkStalenessResult, check_link_staleness
 
@@ -202,6 +203,8 @@ class KleuwGUI:
         )
         self._tooltips_enabled = enable_tooltips
         self._project = project if project is not None else Project()
+        self._project_path: str | None = None
+        self._is_dirty = False
         self.root = root if root is not None else self._tk.Tk(className="kleuw")
         self.root.title("Kleuw")
         self.root.geometry("1200x800")
@@ -235,6 +238,12 @@ class KleuwGUI:
 
     def _get_action_callback(self, action: str) -> Callable[[], None]:
         callbacks: dict[str, Callable[[], None]] = {
+            "New": self._new_project,
+            "New Project": self._new_project,
+            "Open": self._open_project,
+            "Open Project": self._open_project,
+            "Save": self._save_project,
+            "Save As": self._save_project_as,
             "Check Staleness": self._run_staleness_check,
             "Create Link": self._create_link,
         }
@@ -503,6 +512,101 @@ class KleuwGUI:
             side=self._tk.LEFT, fill=self._tk.Y, padx=6
         )
         self._ttk.Label(bar, textvariable=self.staleness_var).pack(side=self._tk.LEFT)
+
+    # ------------------------------------------------------------------
+    # Project IO
+    # ------------------------------------------------------------------
+    def _new_project(self) -> None:
+        if self._confirm_discard_changes():
+            self._project = Project()
+            self._project_path = None
+            self._reset_ui_state()
+
+    def _open_project(self) -> None:
+        if not self._confirm_discard_changes():
+            return
+        path = self._filedialog.askopenfilename(
+            title="Open Kleuw Project",
+            filetypes=(("Kleuw JSON", "*.json"), ("All files", "*.*")),
+        )
+        if not path:
+            return
+        try:
+            project = load_project(path)
+        except (OSError, ValueError) as exc:
+            self._messagebox.showerror(
+                title="Kleuw", message=f"Could not open '{path}':\n{exc}"
+            )
+            return
+        self._project = project
+        self._project_path = path
+        self._reset_ui_state()
+        self.project_path_var.set(path)
+        self._files = [
+            str(entry.get("path", ""))
+            for entry in self._project.files
+            if isinstance(entry, dict) and "path" in entry
+        ]
+        if self._file_listbox:
+            for file_path in self._files:
+                self._file_listbox.insert(self._tk.END, file_path)
+
+    def _save_project(self) -> None:
+        if self._project_path is None:
+            self._save_project_as()
+            return
+        try:
+            save_project(self._project_path, self._project)
+            self._set_dirty(False)
+        except (OSError, ValueError) as exc:
+            self._messagebox.showerror(
+                title="Kleuw",
+                message=f"Could not save '{self._project_path}':\n{exc}",
+            )
+
+    def _save_project_as(self) -> None:
+        path = self._filedialog.asksaveasfilename(
+            title="Save Kleuw Project As",
+            filetypes=(("Kleuw JSON", "*.json"), ("All files", "*.*")),
+            defaultextension=".json",
+        )
+        if not path:
+            return
+        try:
+            save_project(path, self._project)
+            self._project_path = path
+            self.project_path_var.set(path)
+            self._set_dirty(False)
+        except (OSError, ValueError) as exc:
+            self._messagebox.showerror(
+                title="Kleuw", message=f"Could not save '{path}':\n{exc}"
+            )
+
+    def _confirm_discard_changes(self) -> bool:
+        if not self._is_dirty:
+            return True
+        return self._messagebox.askyesno(
+            title="Kleuw",
+            message="You have unsaved changes. Are you sure you want to discard them?",
+        )
+
+    def _reset_ui_state(self) -> None:
+        self.project_path_var.set("New Project (unsaved)")
+        self._set_dirty(False)
+        self._staleness_results = {}
+        self._staleness_summary = None
+        self._show_stale_only = False
+        self._files.clear()
+        if self._file_listbox:
+            self._file_listbox.delete(0, self._tk.END)
+        if self._left_viewer:
+            self._apply_viewer_content(self._left_viewer, "", "")
+        if self._right_viewer:
+            self._apply_viewer_content(self._right_viewer, "", "")
+        self._clear_all_selections()
+        self._refresh_links_panel()
+        self._update_staleness_label()
+        self._update_links_filter_button()
 
     # ------------------------------------------------------------------
     # Staleness helpers
@@ -1048,7 +1152,7 @@ class KleuwGUI:
         except ValueError as exc:
             self._messagebox.showerror(title="Kleuw", message=str(exc))
             return
-        self.dirty_var.set("● Unsaved changes")
+        self._set_dirty(True)
         self._refresh_links_panel(selected_id=link.id)
         self._update_create_button_state()
 
@@ -1202,7 +1306,7 @@ class KleuwGUI:
             if self._project.remove_link(link_id) is not None:
                 removed = True
         if removed:
-            self.dirty_var.set("● Unsaved changes")
+            self._set_dirty(True)
             self._refresh_links_panel()
 
     def _edit_selected_link(self) -> None:
@@ -1307,8 +1411,12 @@ class KleuwGUI:
             link_entry["note"] = note
         elif "note" in link_entry:
             del link_entry["note"]
-        self.dirty_var.set("● Unsaved changes")
+        self._set_dirty(True)
         self._refresh_links_panel(selected_id=link_id)
+
+    def _set_dirty(self, is_dirty: bool) -> None:
+        self._is_dirty = is_dirty
+        self.dirty_var.set("● Unsaved changes" if is_dirty else "● Clean")
 
     def run(self) -> None:
         """Start the Tkinter main loop."""

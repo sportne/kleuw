@@ -71,6 +71,9 @@ class StubMessageBox:
     def showerror(self, *, title: str, message: str) -> None:
         self.error_calls.append((title, message))
 
+    def askyesno(self, *, title: str, message: str) -> bool:
+        return self.askyesno_response
+
 
 def build_stub_tk_module() -> SimpleNamespace:
     """Return a Tkinter-like namespace compatible with ``KleuwGUI``."""
