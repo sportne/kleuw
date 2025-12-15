@@ -72,7 +72,7 @@ class StubMessageBox:
         self.error_calls.append((title, message))
 
     def askyesno(self, *, title: str, message: str) -> bool:
-        return self.askyesno_response
+        return getattr(self, "askyesno_response", False)
 
 
 def build_stub_tk_module() -> SimpleNamespace:

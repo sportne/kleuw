@@ -16,8 +16,8 @@ from tkinter import filedialog, messagebox, ttk
 from typing import Any
 
 from kleuw.hashing import compute_region_hash
-from kleuw.model import HashDigest, LineSpan, Link, LinkType, RegionHash, Target
 from kleuw.io import load_project, save_project
+from kleuw.model import HashDigest, LineSpan, Link, LinkType, RegionHash, Target
 from kleuw.project import Project
 from kleuw.staleness import LinkStalenessResult, check_link_staleness
 
@@ -197,7 +197,7 @@ class KleuwGUI:
     ) -> None:
         self._tk = tk_module
         self._ttk = ttk_module
-        self._messagebox = messagebox_module
+        self._messagebox: Any = messagebox_module
         self._filedialog = (
             filedialog_module if filedialog_module is not None else filedialog
         )
@@ -585,9 +585,11 @@ class KleuwGUI:
     def _confirm_discard_changes(self) -> bool:
         if not self._is_dirty:
             return True
-        return self._messagebox.askyesno(
-            title="Kleuw",
-            message="You have unsaved changes. Are you sure you want to discard them?",
+        return bool(
+            self._messagebox.askyesno(
+                title="Kleuw",
+                message="You have unsaved changes. Are you sure you want to discard them?",
+            )
         )
 
     def _reset_ui_state(self) -> None:

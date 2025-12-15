@@ -9,7 +9,12 @@ import pytest
 
 from kleuw.gui import KleuwGUI
 from kleuw.project import Project
-from tests._gui_stubs import StubMessageBox, StubRoot, build_stub_tk_module, build_stub_ttk_module
+from tests._gui_stubs import (
+    StubMessageBox,
+    StubRoot,
+    build_stub_tk_module,
+    build_stub_ttk_module,
+)
 
 
 @pytest.fixture
@@ -52,7 +57,9 @@ def test_new_project_clears_state(gui_stubs: SimpleNamespace) -> None:
 
 def test_open_project_loads_data(tmp_path: Path, gui_stubs: SimpleNamespace) -> None:
     proj_path = tmp_path / "project.json"
-    proj_path.write_text('{"version": 1, "files": [{"id": "f1", "path": "a.txt"}], "links": []}')
+    proj_path.write_text(
+        '{"version": 1, "files": [{"id": "f1", "path": "a.txt"}], "links": []}'
+    )
     filedialog = SimpleNamespace(askopenfilename=lambda **_: str(proj_path))
     gui = _make_gui(gui_stubs, filedialog)
 
@@ -75,7 +82,10 @@ def test_save_project_writes_to_path(
     gui._save_project()
 
     assert "Clean" in gui.dirty_var.get()
-    assert proj_path.read_text() == '{\n  "files": [\n    {\n      "id": "f1",\n      "path": "a.txt"\n    }\n  ],\n  "links": [],\n  "version": 1\n}\n'
+    assert (
+        proj_path.read_text()
+        == '{\n  "files": [\n    {\n      "id": "f1",\n      "path": "a.txt"\n    }\n  ],\n  "links": [],\n  "version": 1\n}\n'
+    )
 
 
 def test_save_project_as_prompts_for_path(
