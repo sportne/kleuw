@@ -18,8 +18,7 @@ This document guides implementation but includes **no code**.
 
 ### Implementation Notes
 
-* `KleuwGUI` is initialized with an in-memory `Project` object. Loading/saving JSON files is performed externally (typically through the CLI) and is not yet wired to the GUI.
-* Menu and toolbar commands other than “Create Link” and “Check Staleness” currently display placeholder dialogs stating that the action is not implemented.
+* The GUI supports creating, opening, and saving project files.
 * The Files panel maintains its own list of convenient file paths for the viewers; it does not mutate the project’s `files[]` entries.
 
 ---
@@ -116,8 +115,7 @@ Buttons should provide tooltips.
 
 Implementation status:
 
-* “Add File”, “Remove File”, “Open Left”, “Open Right”, “Create Link”, and “Check Staleness” execute real callbacks.
-* The remaining toolbar buttons share the same placeholders as their menu counterparts until persistence is implemented.
+* All toolbar buttons now execute real callbacks.
 
 ---
 
@@ -275,7 +273,8 @@ Displays:
 * Ctrl+Enter – Create Link (real action)
 * Ctrl+K – Check Staleness (real action)
 * Esc – Clear selections (real action)
-* Ctrl+N / Ctrl+O / Ctrl+S / Ctrl++ / Ctrl+- / Alt+W – currently display placeholder dialogs until persistence and view settings are implemented
+* Ctrl+N / Ctrl+O / Ctrl+S – file operations
+* Ctrl++ / Ctrl+- / Alt+W – currently display placeholder dialogs until view settings are implemented
 
 ---
 

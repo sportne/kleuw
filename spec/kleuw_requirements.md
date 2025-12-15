@@ -25,7 +25,7 @@ The tool is intended as a foundation for future digital thread tooling.
 * **FR-1:** Kleuw shall load and save a project JSON file that adheres to the Kleuw schema.
 * **FR-2:** Kleuw shall support creating new empty project files.
 * **FR-3:** Kleuw shall validate project files against baseline structural requirements.
-* **FR-4:** The GUI shall track unsaved changes via a dirty indicator; persistence and close warnings are handled externally through the CLI or embedding application.
+* **FR-4:** The GUI shall track unsaved changes via a dirty indicator and prompt the user before discarding them.
 
 ### 3.2 File Catalog
 
@@ -34,7 +34,7 @@ The tool is intended as a foundation for future digital thread tooling.
 * **FR-7:** Kleuw shall allow referencing a file by path or by a stable file identifier, automatically preferring `file_id` when a project entry matches the on-disk path.
 * **FR-8:** If a file is missing or cannot be decoded, Kleuw shall report the corresponding links as stale.
 
-Implementation note: The GUI's Files panel maintains its own ad-hoc list solely for opening files inside the viewers; callers must use the CLI or project helpers to persist file entries.
+Implementation note: The GUI's Files panel maintains its own ad-hoc list solely for opening files inside the viewers.
 
 ### 3.3 Relationship Creation
 
