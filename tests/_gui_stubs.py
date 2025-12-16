@@ -96,7 +96,10 @@ def build_stub_tk_module() -> SimpleNamespace:
     module.SUNKEN = "sunken"
     module.Menu = _make_widget_factory("Menu")
     module.Listbox = _make_widget_factory("Listbox")
-    module.Text = _make_widget_factory("Text")
+    text_widget_mock = MagicMock()
+    text_widget_mock.get.return_value = "hello\nworld"
+    text_widget_mock.cget.return_value = "disabled"
+    module.Text = MagicMock(return_value=text_widget_mock)
     module.Scrollbar = _make_widget_factory("Scrollbar")
     module.Toplevel = _make_widget_factory("Toplevel")
     module.StringVar = MagicMock(side_effect=lambda value="", **_: StubStringVar(value))

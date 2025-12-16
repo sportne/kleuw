@@ -99,3 +99,20 @@ def test_save_project_as_prompts_for_path(
 
     assert gui._project_path == str(proj_path)
     assert proj_path.exists()
+
+
+def test_load_file_into_viewer_disables_text_widget(
+    tmp_path: Path, gui_stubs: SimpleNamespace
+) -> None:
+    file_path = tmp_path / "sample.txt"
+    file_path.write_text("hello\nworld")
+    filedialog = SimpleNamespace()
+    gui = _make_gui(gui_stubs, filedialog)
+    viewer = gui._right_viewer
+    assert viewer is not None
+
+    gui._load_file_into_viewer(viewer, str(file_path))
+
+    text_widget = viewer.text_widget
+    assert text_widget.get("1.0", "end-1c") == "hello\nworld"
+    assert text_widget.cget("state") == gui_stubs.tk.DISABLED

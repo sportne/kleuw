@@ -39,6 +39,7 @@ Implementation note: The GUI's Files panel maintains its own ad-hoc list solely 
 ### 3.3 Relationship Creation
 
 * **FR-9:** The GUI shall allow selecting two files and displaying them side-by-side.
+    * **FR-9.1:** The GUI's file viewers must be configured in a read-only state and must not allow user input.
 * **FR-10:** The GUI shall allow selecting line ranges for each file.
 * **FR-11:** The user shall be able to choose a relationship type from a fixed enumerated list.
 * **FR-12:** Kleuw shall support whole-file relationships when no lines are selected.
