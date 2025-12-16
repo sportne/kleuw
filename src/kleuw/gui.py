@@ -980,7 +980,7 @@ class KleuwGUI:
         widget.delete("1.0", self._tk.END)
         if text_value:
             widget.insert("1.0", text_value)
-        widget.configure(state=self._tk.NORMAL)
+        widget.configure(state=self._tk.DISABLED)
 
     def _normalize_newlines(self, content: str) -> str:
         normalized = content.replace("\r\n", "\n").replace("\r", "\n")

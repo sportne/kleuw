@@ -66,7 +66,7 @@ def compute_region_hash(
         raise ValueError("end_line must be >= start_line when both are provided.")
 
     path = Path(file_path)
-    with path.open("r", encoding="utf-8", newline=None) as handle:
+    with path.open("r", encoding="utf-8") as handle:
         file_text = handle.read()
 
     lines = file_text.splitlines()
