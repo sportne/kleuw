@@ -12,23 +12,12 @@ from kleuw.staleness import LinkStalenessResult, TargetStalenessResult
 pytestmark = pytest.mark.gui
 
 
-@pytest.fixture()
-def mock_tkinter(monkeypatch: pytest.MonkeyPatch) -> MagicMock:
-    """Replace the `tkinter` and `ttk` modules with mocks."""
-    mock_tk = MagicMock(name="tkinter")
-    mock_ttk = MagicMock(name="ttk")
-    monkeypatch.setattr("kleuw.gui.tk", mock_tk)
-    monkeypatch.setattr("kleuw.gui.ttk", mock_ttk)
-    mock_tk.Tk.return_value = MagicMock(name="Tk")
-    return mock_tk
-
-
 def test_tooltip_shows_for_stale_links_and_hides_for_others(
     mock_tkinter: MagicMock,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Verify that tooltips appear for stale links and hide otherwise."""
-    gui = KleuwGUI()
+    gui = KleuwGUI(tk_module=mock_tkinter, ttk_module=MagicMock())
     tree = gui._links_tree
     assert tree is not None
     tooltip = gui._link_tooltip
