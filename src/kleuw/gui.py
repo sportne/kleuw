@@ -526,9 +526,9 @@ class KleuwGUI:
         result = self._staleness_results.get(row_id) if row_id else None
         if result and result.stale:
             changed = []
-            if result.src_changed:
+            if result.src.stale:
                 changed.append("source")
-            if result.dst_changed:
+            if result.dst.stale:
                 changed.append("destination")
             tooltip_text = f"Changed: {', '.join(changed)}"
             self._link_tooltip.set_text(tooltip_text)
