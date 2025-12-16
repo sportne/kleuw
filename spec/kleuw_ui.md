@@ -149,6 +149,9 @@ Two monospaced text widgets with:
 * Read-only text
 * Line-selection highlighting
 
+#### FR-6.1.1
+The text viewers must be configured in a read-only state and must not allow user input.
+
 ### 6.2 File Display Behavior
 
 * Opening a file loads its text (UTF-8 decoding with universal newlines)
