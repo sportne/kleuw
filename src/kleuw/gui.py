@@ -151,19 +151,29 @@ LINK_COLUMNS: tuple[str, ...] = (
 class Tooltip:
     """Simple tooltip helper for Tkinter widgets."""
 
-    def __init__(self, widget: tk.Widget, text: str) -> None:
+    def __init__(self, widget: tk.Widget, text: str = "") -> None:
         self.widget = widget
         self.text = text
         self._tip: tk.Toplevel | None = None
-        widget.bind("<Enter>", self._show)
-        widget.bind("<Leave>", self._hide)
-        widget.bind("<ButtonPress>", self._hide)
 
-    def _show(self, _event: tk.Event[Any] | None = None) -> None:
-        if self._tip is not None:
+    def set_text(self, text: str) -> None:
+        """Update the tooltip text."""
+        self.text = text
+
+    def show(self, event: tk.Event[Any] | None = None) -> None:
+        """Display the tooltip at the event's position."""
+        if self._tip:
+            self.hide()
+
+        if not self.text:
             return
+
         x = self.widget.winfo_rootx() + 12
         y = self.widget.winfo_rooty() + self.widget.winfo_height() + 6
+        if event:
+            x = event.x_root + 12
+            y = event.y_root + 10
+
         self._tip = tk.Toplevel(self.widget)
         self._tip.wm_overrideredirect(True)
         self._tip.wm_geometry(f"+{x}+{y}")
@@ -175,10 +185,19 @@ class Tooltip:
         )
         label.pack()
 
-    def _hide(self, _event: tk.Event[Any] | None = None) -> None:
-        if self._tip is not None:
+    def hide(self, _event: tk.Event[Any] | None = None) -> None:
+        """Hide the tooltip."""
+        if self._tip:
             self._tip.destroy()
-            self._tip = None
+        self._tip = None
+
+
+def create_tooltip(widget: tk.Widget, text: str) -> None:
+    """Create and bind a simple static tooltip."""
+    tooltip = Tooltip(widget, text)
+    widget.bind("<Enter>", tooltip.show)
+    widget.bind("<Leave>", tooltip.hide)
+    widget.bind("<ButtonPress>", tooltip.hide)
 
 
 class KleuwGUI:
@@ -225,6 +244,7 @@ class KleuwGUI:
         self._staleness_results: dict[str, LinkStalenessResult] = {}
         self._staleness_summary: tuple[int, int] | None = None
         self._show_stale_only = False
+        self._link_tooltip: Tooltip | None = None
 
         style = self._ttk.Style()
         style.configure("Tooltip.TLabel", background="#ffffe0")
@@ -276,7 +296,7 @@ class KleuwGUI:
             )
             widget.pack(side=self._tk.LEFT, padx=4)
             if self._tooltips_enabled:
-                Tooltip(widget, button.tooltip)
+                create_tooltip(widget, button.tooltip)
 
     def _build_layout(self) -> None:
         container = self._ttk.PanedWindow(self.root, orient=self._tk.VERTICAL)
@@ -330,7 +350,7 @@ class KleuwGUI:
             )
             widget.pack(fill=self._tk.X, pady=2)
             if self._tooltips_enabled:
-                Tooltip(widget, button.tooltip)
+                create_tooltip(widget, button.tooltip)
 
     def _build_workspace(self, parent: Any) -> None:
         self._ttk.Label(
@@ -471,6 +491,10 @@ class KleuwGUI:
             lambda event: self._show_links_context_menu(event, tree),
         )
         self._links_tree = tree
+        if self._tooltips_enabled:
+            self._link_tooltip = Tooltip(tree)
+            tree.bind("<Motion>", self._show_link_tooltip)
+            tree.bind("<Leave>", self._hide_link_tooltip)
 
         button_row = self._ttk.Frame(parent, padding=(0, 8, 0, 0))
         button_row.pack(fill=self._tk.X)
@@ -493,6 +517,28 @@ class KleuwGUI:
         self._show_all_links_button.pack(side=self._tk.LEFT, padx=(4, 0))
         self._refresh_links_panel()
         self._update_links_filter_button()
+
+    def _show_link_tooltip(self, event: tk.Event[Any]) -> None:
+        if self._links_tree is None or self._link_tooltip is None:
+            return
+        row_id = self._links_tree.identify_row(event.y)
+
+        result = self._staleness_results.get(row_id) if row_id else None
+        if result and result.stale:
+            changed = []
+            if result.src_changed:
+                changed.append("source")
+            if result.dst_changed:
+                changed.append("destination")
+            tooltip_text = f"Changed: {', '.join(changed)}"
+            self._link_tooltip.set_text(tooltip_text)
+            self._link_tooltip.show(event)
+        else:
+            self._link_tooltip.hide()
+
+    def _hide_link_tooltip(self, _event: tk.Event[Any] | None = None) -> None:
+        if self._link_tooltip:
+            self._link_tooltip.hide()
 
     def _build_status_bar(self) -> None:
         bar = self._ttk.Frame(self.root, relief=self._tk.SUNKEN, padding=(8, 4))
