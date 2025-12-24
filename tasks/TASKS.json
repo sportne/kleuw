@@ -463,6 +463,193 @@
         "spec/kleuw_overall_spec.md"
       ],
       "est_size": "M"
+    },
+    {
+      "id": "T-025",
+      "status": "to do",
+      "title": "Implement 'Recent Projects' menu item",
+      "description": "Implement the 'File > Recent Projects' menu item to display a list of recently opened projects and allow the user to open them.",
+      "depends_on": ["T-014"],
+      "files": ["src/kleuw/gui.py"],
+      "category": "gui",
+      "spec_refs": ["spec/kleuw_ui.md"],
+      "est_size": "S"
+    },
+    {
+      "id": "T-026",
+      "status": "to do",
+      "title": "Implement 'Exit' menu item",
+      "description": "Implement the 'File > Exit' menu item to close the application, prompting to save unsaved changes.",
+      "depends_on": ["T-014"],
+      "files": ["src/kleuw/gui.py"],
+      "category": "gui",
+      "spec_refs": ["spec/kleuw_ui.md"],
+      "est_size": "S"
+    },
+    {
+      "id": "T-027",
+      "status": "to do",
+      "title": "Implement 'Undo' menu item",
+      "description": "Implement the 'Edit > Undo' menu item to undo the last action.",
+      "depends_on": ["T-014"],
+      "files": ["src/kleuw/gui.py"],
+      "category": "gui",
+      "spec_refs": ["spec/kleuw_ui.md"],
+      "est_size": "M"
+    },
+    {
+      "id": "T-028",
+      "status": "to do",
+      "title": "Implement 'Redo' menu item",
+      "description": "Implement the 'Edit > Redo' menu item to redo the last undone action.",
+      "depends_on": ["T-014"],
+      "files": ["src/kleuw/gui.py"],
+      "category": "gui",
+      "spec_refs": ["spec/kleuw_ui.md"],
+      "est_size": "M"
+    },
+    {
+      "id": "T-029",
+      "status": "to do",
+      "title": "Implement 'Delete Link' menu items",
+      "description": "Implement the 'Edit > Delete Link' and 'Links > Delete Link' menu items to delete the selected link(s) in the links panel.",
+      "depends_on": ["T-017"],
+      "files": ["src/kleuw/gui.py"],
+      "category": "gui",
+      "spec_refs": ["spec/kleuw_ui.md"],
+      "est_size": "S"
+    },
+    {
+      "id": "T-030",
+      "status": "to do",
+      "title": "Implement 'Preferences' menu item",
+      "description": "Implement the 'Edit > Preferences' menu item to open a preferences dialog.",
+      "depends_on": ["T-014"],
+      "files": ["src/kleuw/gui.py"],
+      "category": "gui",
+      "spec_refs": ["spec/kleuw_ui.md"],
+      "est_size": "M"
+    },
+    {
+      "id": "T-031",
+      "status": "to do",
+      "title": "Implement 'Toggle Files Panel' menu item",
+      "description": "Implement the 'View > Toggle Files Panel' menu item to show or hide the files panel.",
+      "depends_on": ["T-014"],
+      "files": ["src/kleuw/gui.py"],
+      "category": "gui",
+      "spec_refs": ["spec/kleuw_ui.md"],
+      "est_size": "S"
+    },
+    {
+      "id": "T-032",
+      "status": "to do",
+      "title": "Implement 'Toggle Links Panel' menu item",
+      "description": "Implement the 'View > Toggle Links Panel' menu item to show or hide the links panel.",
+      "depends_on": ["T-014"],
+      "files": ["src/kleuw/gui.py"],
+      "category": "gui",
+      "spec_refs": ["spec/kleuw_ui.md"],
+      "est_size": "S"
+    },
+    {
+      "id": "T-033",
+      "status": "to do",
+      "title": "Implement 'Increase Font Size' menu item",
+      "description": "Implement the 'View > Increase Font Size' menu item to increase the font size in the text viewers.",
+      "depends_on": ["T-015"],
+      "files": ["src/kleuw/gui.py"],
+      "category": "gui",
+      "spec_refs": ["spec/kleuw_ui.md"],
+      "est_size": "S"
+    },
+    {
+      "id": "T-034",
+      "status": "to do",
+      "title": "Implement 'Decrease Font Size' menu item",
+      "description": "Implement the 'View > Decrease Font Size' menu item to decrease the font size in the text viewers.",
+      "depends_on": ["T-015"],
+      "files": ["src/kleuw/gui.py"],
+      "category": "gui",
+      "spec_refs": ["spec/kleuw_ui.md"],
+      "est_size": "S"
+    },
+    {
+      "id": "T-035",
+      "status": "to do",
+      "title": "Implement 'Toggle Line Wrapping' menu item",
+      "description": "Implement the 'View > Toggle Line Wrapping' menu item to enable or disable line wrapping in the text viewers.",
+      "depends_on": ["T-015"],
+      "files": ["src/kleuw/gui.py"],
+      "category": "gui",
+      "spec_refs": ["spec/kleuw_ui.md"],
+      "est_size": "S"
+    },
+    {
+      "id": "T-036",
+      "status": "to do",
+      "title": "Implement 'Edit Link' menu item",
+      "description": "Implement the 'Links > Edit Link' menu item to open the edit dialog for the selected link.",
+      "depends_on": ["T-017"],
+      "files": ["src/kleuw/gui.py"],
+      "category": "gui",
+      "spec_refs": ["spec/kleuw_ui.md"],
+      "est_size": "S"
+    },
+    {
+      "id": "T-037",
+      "status": "to do",
+      "title": "Implement 'Recompute Hashes' menu item",
+      "description": "Implement the 'Links > Recompute Hashes' menu item to recompute the hashes for all links.",
+      "depends_on": ["T-018"],
+      "files": ["src/kleuw/gui.py"],
+      "category": "gui",
+      "spec_refs": ["spec/kleuw_ui.md"],
+      "est_size": "M"
+    },
+    {
+      "id": "T-038",
+      "status": "to do",
+      "title": "Implement 'Validate Project' menu item",
+      "description": "Implement the 'Tools > Validate Project' menu item to validate the current project against the schema.",
+      "depends_on": ["T-003", "T-014"],
+      "files": ["src/kleuw/gui.py"],
+      "category": "gui",
+      "spec_refs": ["spec/kleuw_ui.md"],
+      "est_size": "S"
+    },
+    {
+      "id": "T-039",
+      "status": "to do",
+      "title": "Implement 'Export Summary' menu item",
+      "description": "Implement the 'Tools > Export Summary' menu item to export a summary of the project.",
+      "depends_on": ["T-014"],
+      "files": ["src/kleuw/gui.py"],
+      "category": "gui",
+      "spec_refs": ["spec/kleuw_ui.md"],
+      "est_size": "M"
+    },
+    {
+      "id": "T-040",
+      "status": "to do",
+      "title": "Implement 'About' menu item",
+      "description": "Implement the 'Help > About' menu item to display an 'About' dialog.",
+      "depends_on": ["T-014"],
+      "files": ["src/kleuw/gui.py"],
+      "category": "gui",
+      "spec_refs": ["spec/kleuw_ui.md"],
+      "est_size": "S"
+    },
+    {
+      "id": "T-041",
+      "status": "to do",
+      "title": "Implement 'Keyboard Shortcuts' menu item",
+      "description": "Implement the 'Help > Keyboard Shortcuts' menu item to display a dialog with a list of keyboard shortcuts.",
+      "depends_on": ["T-014"],
+      "files": ["src/kleuw/gui.py"],
+      "category": "gui",
+      "spec_refs": ["spec/kleuw_ui.md"],
+      "est_size": "S"
     }
   ]
 }
