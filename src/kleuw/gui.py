@@ -15,6 +15,7 @@ from pathlib import Path
 from tkinter import filedialog, messagebox, ttk
 from typing import Any
 
+from kleuw.commands import CommandHistory, CreateLinkCommand
 from kleuw.hashing import compute_region_hash
 from kleuw.io import load_project, save_project
 from kleuw.model import HashDigest, LineSpan, Link, LinkType, RegionHash, Target
@@ -224,6 +225,7 @@ class KleuwGUI:
         self._project = project if project is not None else Project()
         self._project_path: str | None = None
         self._is_dirty = False
+        self._command_history = CommandHistory()
         self.root = root if root is not None else self._tk.Tk(className="kleuw")
         self.root.title("Kleuw")
         self.root.geometry("1200x800")
@@ -272,6 +274,8 @@ class KleuwGUI:
             "Add File": self._add_files,
             "Check Staleness": self._run_staleness_check,
             "Create Link": self._create_link,
+            "Undo": self._undo,
+            "Redo": self._redo,
         }
         return callbacks.get(action, partial(self._placeholder_action, action))
 
@@ -1241,14 +1245,27 @@ class KleuwGUI:
             src=src_target,
             dst=dst_target,
         )
+        command = CreateLinkCommand(self._project, link.to_dict())
         try:
-            self._project.add_link(link)
+            self._command_history.execute(command)
         except ValueError as exc:
             self._messagebox.showerror(title="Kleuw", message=str(exc))
             return
         self._set_dirty(True)
         self._refresh_links_panel(selected_id=link.id)
         self._update_create_button_state()
+
+    def _undo(self) -> None:
+        if self._command_history.can_undo:
+            self._command_history.undo()
+            self._set_dirty(True)
+            self._refresh_links_panel()
+
+    def _redo(self) -> None:
+        if self._command_history.can_redo:
+            self._command_history.redo()
+            self._set_dirty(True)
+            self._refresh_links_panel()
 
     # ------------------------------------------------------------------
     # Links panel helpers

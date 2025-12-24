@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from types import SimpleNamespace
+from typing import Any
 
 import pytest
 
 from kleuw.gui import KleuwGUI
+from kleuw.model import RegionHash
 from kleuw.project import Project
 from tests._gui_stubs import (
     StubMessageBox,
@@ -94,7 +97,7 @@ def test_remove_selected_files_removes_from_listbox(
 
 
 def test_edit_selected_link_opens_dialog(
-    gui_stubs: SimpleNamespace, monkeypatch
+    gui_stubs: SimpleNamespace, monkeypatch: Any
 ) -> None:
     """The 'Edit Link' action should open the edit dialog for the selected link."""
     project = Project(
@@ -112,7 +115,7 @@ def test_edit_selected_link_opens_dialog(
     # Mock the dialog opening method
     dialog_opened = False
 
-    def mock_open_edit_dialog(link_entry):
+    def mock_open_edit_dialog(link_entry: Any) -> None:
         nonlocal dialog_opened
         dialog_opened = True
 
@@ -125,3 +128,84 @@ def test_edit_selected_link_opens_dialog(
     gui._edit_selected_link()
 
     assert dialog_opened
+
+
+def test_undo_redo_create_link(
+    gui_stubs: SimpleNamespace, monkeypatch: Any, tmp_path: Path
+) -> None:
+    """Test undoing and redoing a create link action."""
+    project = Project()
+    gui, messagebox = _make_gui(gui_stubs, project=project)
+
+    left_file = tmp_path / "a.txt"
+    right_file = tmp_path / "b.txt"
+    left_file.write_text("a")
+    right_file.write_text("b")
+
+    # Mock the necessary UI components and state for creating a link
+    gui._left_viewer.file_path = str(left_file)
+    gui._right_viewer.file_path = str(right_file)
+    gui.relationship_var.set("implements")
+    gui._left_viewer.selection_start = 1
+    gui._right_viewer.selection_start = 1
+    gui._left_viewer.line_count = 1
+    gui._right_viewer.line_count = 1
+
+    assert len(project.links) == 0
+
+    # Create a link
+    gui._create_link()
+    assert not messagebox.error_calls, " ".join(
+        str(call) for call in messagebox.error_calls
+    )
+    assert len(project.links) == 1
+    link_id = project.links[0]["id"]
+
+    # Undo the link creation
+    gui._undo()
+    assert len(project.links) == 0
+    assert project.find_link_by_id(link_id) is None
+
+    # Redo the link creation
+    gui._redo()
+    assert len(project.links) == 1
+    assert project.find_link_by_id(link_id) is not None
+
+
+def test_create_link_with_duplicate_id_shows_error(
+    gui_stubs: SimpleNamespace, monkeypatch: Any, tmp_path: Path
+) -> None:
+    """Test that creating a link with a duplicate ID shows an error."""
+    project = Project(
+        links=[
+            {
+                "id": "link-1",
+                "type": "implements",
+                "src": {"path": "a"},
+                "dst": {"path": "b"},
+            }
+        ]
+    )
+    gui, messagebox = _make_gui(gui_stubs, project=project)
+
+    left_file = tmp_path / "a.txt"
+    right_file = tmp_path / "b.txt"
+    left_file.write_text("a")
+    right_file.write_text("b")
+
+    # Mock the necessary UI components and state for creating a link
+    gui._left_viewer.file_path = str(left_file)
+    gui._right_viewer.file_path = str(right_file)
+    gui.relationship_var.set("implements")
+    gui._left_viewer.selection_start = 1
+    gui._right_viewer.selection_start = 1
+    gui._left_viewer.line_count = 1
+    gui._right_viewer.line_count = 1
+
+    monkeypatch.setattr(gui, "_generate_link_id", lambda: "link-1")
+
+    # Create a link
+    gui._create_link()
+
+    assert len(messagebox.error_calls) == 1
+    assert "already exists" in messagebox.error_calls[0][1]

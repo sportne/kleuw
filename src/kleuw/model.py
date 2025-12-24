@@ -67,6 +67,10 @@ class HashDigest:
 class RegionHash(HashDigest):
     """Hash digest describing a source or destination region."""
 
+    def to_dict(self) -> dict[str, str]:
+        """Return a dictionary representation of the region hash."""
+        return {"algo": self.algo, "value": self.value}
+
 
 @dataclass(frozen=True, slots=True)
 class LineSpan:
@@ -92,6 +96,10 @@ class LineSpan:
         """Return the effective end of the span."""
 
         return self.end if self.end is not None else self.start
+
+    def to_dict(self) -> dict[str, int | None]:
+        """Return a dictionary representation of the line span."""
+        return {"start": self.start, "end": self.end}
 
 
 @dataclass(frozen=True, slots=True)
@@ -119,6 +127,19 @@ class Target:
             raise ValueError("file_id must be a non-empty string when provided.")
         if self.path is not None and not self.path:
             raise ValueError("path must be a non-empty string when provided.")
+
+    def to_dict(self) -> dict[str, object]:
+        """Return a dictionary representation of the target."""
+        data: dict[str, object] = {}
+        if self.file_id is not None:
+            data["file_id"] = self.file_id
+        if self.path is not None:
+            data["path"] = self.path
+        if self.lines is not None:
+            data["lines"] = self.lines.to_dict()
+        if self.region_hash is not None:
+            data["region_hash"] = self.region_hash.to_dict()
+        return data
 
 
 @dataclass(frozen=True, slots=True)
@@ -150,6 +171,26 @@ class Link:
             raise ValueError(
                 "Tags must be non-empty and contain no whitespace-only values."
             )
+
+    def to_dict(self) -> dict[str, object]:
+        """Return a dictionary representation of the link."""
+        data: dict[str, object] = {
+            "id": self.id,
+            "type": self.type.value,
+            "src": self.src.to_dict(),
+            "dst": self.dst.to_dict(),
+        }
+        if not self.directed:
+            data["directed"] = self.directed
+        if self.created is not None:
+            data["created"] = self.created
+        if self.author is not None:
+            data["author"] = self.author
+        if self.tags:
+            data["tags"] = self.tags
+        if self.note is not None:
+            data["note"] = self.note
+        return data
 
 
 @dataclass(frozen=True, slots=True)
