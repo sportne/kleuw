@@ -9,7 +9,6 @@ from typing import Any
 import pytest
 
 from kleuw.gui import KleuwGUI
-from kleuw.model import RegionHash
 from kleuw.project import Project
 from tests._gui_stubs import (
     StubMessageBox,
