@@ -56,3 +56,43 @@ def test_gui_builds_layout_with_stubs(
     )
     shortcut_bindings = {sequence for sequence, _ in root.bindings}
     assert "<Control-s>" in shortcut_bindings
+
+
+def test_gui_toggles_files_panel_visibility(
+    stub_tk_module: SimpleNamespace,
+    stub_ttk_module: SimpleNamespace,
+    stub_messagebox: StubMessageBox,
+) -> None:
+    """The files panel should be hidden and shown when toggled."""
+
+    root = StubRoot()
+    gui = KleuwGUI(
+        root=root,
+        tk_module=stub_tk_module,
+        ttk_module=stub_ttk_module,
+        messagebox_module=stub_messagebox,
+        enable_tooltips=False,
+    )
+
+    upper_paned_window = gui._upper_paned_window
+    assert upper_paned_window is not None
+    files_frame = gui._files_frame
+    assert files_frame is not None
+
+    # Initially, the files panel should be present.
+    initial_panes = upper_paned_window.panes()
+    assert str(files_frame) in initial_panes
+    assert len(initial_panes) == 2
+
+    # Hide the panel.
+    gui._toggle_files_panel()
+    panes_after_hide = upper_paned_window.panes()
+    assert str(files_frame) not in panes_after_hide
+    assert len(panes_after_hide) == 1
+
+    # Show the panel again.
+    gui._toggle_files_panel()
+    panes_after_show = upper_paned_window.panes()
+    assert str(files_frame) in panes_after_show
+    assert len(panes_after_show) == 2
+    assert panes_after_show[0] == str(files_frame)

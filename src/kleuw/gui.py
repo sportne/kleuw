@@ -86,7 +86,6 @@ MENU_DEFINITION: tuple[tuple[str, Sequence[MenuItem]], ...] = (
     (
         "View",
         (
-            MenuItem("Toggle Files Panel", "Show or hide the files panel."),
             MenuItem("Toggle Links Panel", "Show or hide the links panel."),
             MenuItem("Increase Font Size", "Make the viewers' font larger."),
             MenuItem("Decrease Font Size", "Make the viewers' font smaller."),
@@ -238,6 +237,8 @@ class KleuwGUI:
         self.staleness_var = self._tk.StringVar(value="Staleness: Unknown")
         self._files: list[str] = []
         self._file_listbox: Any | None = None
+        self._files_frame: Any | None = None
+        self._upper_paned_window: Any | None = None
         self._left_viewer: ViewerPane | None = None
         self._right_viewer: ViewerPane | None = None
         self.relationship_var = self._tk.StringVar(value="")
@@ -277,6 +278,7 @@ class KleuwGUI:
             "Undo": self._undo,
             "Redo": self._redo,
             "Preferences": self._open_preferences_dialog,
+            "Toggle Files Panel": self._toggle_files_panel,
         }
         return callbacks.get(action, partial(self._placeholder_action, action))
 
@@ -296,6 +298,11 @@ class KleuwGUI:
                         label=item.label,
                         command=self._get_action_callback(item.label),
                     )
+            if menu_label == "View":
+                menu.add_command(
+                    label="Toggle Files Panel",
+                    command=self._get_action_callback("Toggle Files Panel"),
+                )
             menu_bar.add_cascade(label=menu_label, menu=menu)
         self.root.config(menu=menu_bar)
 
@@ -319,10 +326,12 @@ class KleuwGUI:
 
         upper = self._ttk.PanedWindow(container, orient=self._tk.HORIZONTAL)
         container.add(upper, weight=3)
+        self._upper_paned_window = upper
 
         files_frame = self._ttk.Frame(upper, padding=8)
         self._build_files_panel(files_frame)
         upper.add(files_frame, weight=1)
+        self._files_frame = files_frame
 
         workspace_frame = self._ttk.Frame(upper, padding=8)
         self._build_workspace(workspace_frame)
@@ -997,6 +1006,16 @@ class KleuwGUI:
         ok_button = self._ttk.Button(button_row, text="OK", command=dialog.destroy)
         ok_button.pack(side=self._tk.LEFT)
         ok_button.focus_set()
+
+    def _toggle_files_panel(self) -> None:
+        """Show or hide the files panel."""
+        if self._files_frame is None or self._upper_paned_window is None:
+            return
+        panes = self._upper_paned_window.panes()
+        if self._files_frame.winfo_exists() and str(self._files_frame) in panes:
+            self._upper_paned_window.remove(self._files_frame)
+        else:
+            self._upper_paned_window.insert(0, self._files_frame, weight=1)
 
     # ------------------------------------------------------------------
     # Files panel helpers
