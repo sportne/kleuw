@@ -15,6 +15,7 @@ from tests._gui_stubs import (
     build_stub_ttk_module,
 )
 
+
 @pytest.fixture
 def gui_stubs() -> SimpleNamespace:
     """Fixture for providing stubbed Tkinter modules."""
@@ -50,7 +51,9 @@ def test_recent_projects_menu_initial_state(gui_stubs: SimpleNamespace) -> None:
     )
 
 
-def test_opening_project_adds_to_recent_list(gui_stubs: SimpleNamespace, monkeypatch) -> None:
+def test_opening_project_adds_to_recent_list(
+    gui_stubs: SimpleNamespace, monkeypatch
+) -> None:
     """Opening a new project should add it to the recent projects list."""
     gui, _ = _make_gui(gui_stubs)
     menu = gui._recent_projects_menu
@@ -86,7 +89,9 @@ def test_opening_project_adds_to_recent_list(gui_stubs: SimpleNamespace, monkeyp
     assert labels == ["/another/project.json", "/fake/project.json"]
 
 
-def test_recent_projects_list_is_capped(gui_stubs: SimpleNamespace, monkeypatch) -> None:
+def test_recent_projects_list_is_capped(
+    gui_stubs: SimpleNamespace, monkeypatch
+) -> None:
     """The recent projects list should not exceed 10 items."""
     gui, _ = _make_gui(gui_stubs)
     for i in range(15):
@@ -96,7 +101,10 @@ def test_recent_projects_list_is_capped(gui_stubs: SimpleNamespace, monkeypatch)
     assert gui._recent_projects[0] == "/proj/14.json"
     assert gui._recent_projects[-1] == "/proj/5.json"
 
-def test_clicking_recent_project_opens_it(gui_stubs: SimpleNamespace, monkeypatch) -> None:
+
+def test_clicking_recent_project_opens_it(
+    gui_stubs: SimpleNamespace, monkeypatch
+) -> None:
     """Clicking a recent project menu item should open that project."""
     gui, _ = _make_gui(gui_stubs)
     open_recent_mock = MagicMock()
@@ -108,7 +116,7 @@ def test_clicking_recent_project_opens_it(gui_stubs: SimpleNamespace, monkeypatc
     gui._add_to_recent_projects("/recent/project.json")
 
     # Extract the command from the mock's call arguments
-    command = menu.add_command.call_args.kwargs['command']
+    command = menu.add_command.call_args.kwargs["command"]
 
     # Call the command
     command()
