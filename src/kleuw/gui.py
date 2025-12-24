@@ -25,6 +25,12 @@ from kleuw.staleness import LinkStalenessResult, check_link_staleness
 __all__ = ["KleuwGUI", "launch"]
 
 
+_FONT_NAME = "TkFixedFont"
+_MIN_FONT_SIZE = 8
+_MAX_FONT_SIZE = 24
+_DEFAULT_FONT_SIZE = 10
+
+
 @dataclass(frozen=True, slots=True)
 class MenuItem:
     """Menu entry description used to construct the menubar."""
@@ -226,6 +232,8 @@ class KleuwGUI:
         self._project_path: str | None = None
         self._is_dirty = False
         self._command_history = CommandHistory()
+        self._font_size = _DEFAULT_FONT_SIZE
+        self._line_wrapping_enabled = False
         self.root = root if root is not None else self._tk.Tk(className="kleuw")
         self.root.title("Kleuw")
         self.root.geometry("1200x800")
@@ -283,6 +291,9 @@ class KleuwGUI:
             "Preferences": self._open_preferences_dialog,
             "Toggle Files Panel": self._toggle_files_panel,
             "Toggle Links Panel": self._toggle_links_panel,
+            "Increase Font Size": self._increase_font_size,
+            "Decrease Font Size": self._decrease_font_size,
+            "Toggle Line Wrapping": self._toggle_line_wrapping,
         }
         return callbacks.get(action, partial(self._placeholder_action, action))
 
@@ -436,7 +447,7 @@ class KleuwGUI:
             state=self._tk.DISABLED,
             width=4,
             takefocus=False,
-            font="TkFixedFont",
+            font=(_FONT_NAME, self._font_size),
             background="#f4f4f4",
             relief=self._tk.SUNKEN,
             borderwidth=0,
@@ -444,9 +455,9 @@ class KleuwGUI:
         line_numbers.pack(side=self._tk.LEFT, fill=self._tk.Y)
         text = self._tk.Text(
             body,
-            wrap=self._tk.NONE,
+            wrap=self._tk.WORD if self._line_wrapping_enabled else self._tk.NONE,
             height=20,
-            font="TkFixedFont",
+            font=(_FONT_NAME, self._font_size),
         )
         text.pack(fill=self._tk.BOTH, expand=True, side=self._tk.LEFT)
         self._make_text_readonly(text)
@@ -1027,6 +1038,35 @@ class KleuwGUI:
             self._main_container.remove(self._links_frame)
         else:
             self._main_container.add(self._links_frame, weight=1)
+
+    def _increase_font_size(self) -> None:
+        """Increase the font size in both viewers."""
+        self._font_size = min(_MAX_FONT_SIZE, self._font_size + 1)
+        self._update_font()
+
+    def _decrease_font_size(self) -> None:
+        """Decrease the font size in both viewers."""
+        self._font_size = max(_MIN_FONT_SIZE, self._font_size - 1)
+        self._update_font()
+
+    def _toggle_line_wrapping(self) -> None:
+        """Toggle line wrapping in both viewers."""
+        self._line_wrapping_enabled = not self._line_wrapping_enabled
+        wrap_mode = self._tk.WORD if self._line_wrapping_enabled else self._tk.NONE
+        if self._left_viewer:
+            self._left_viewer.text_widget.configure(wrap=wrap_mode)
+        if self._right_viewer:
+            self._right_viewer.text_widget.configure(wrap=wrap_mode)
+
+    def _update_font(self) -> None:
+        """Apply the current font size to both viewers."""
+        font = (_FONT_NAME, self._font_size)
+        if self._left_viewer:
+            self._left_viewer.text_widget.configure(font=font)
+            self._left_viewer.line_numbers_widget.configure(font=font)
+        if self._right_viewer:
+            self._right_viewer.text_widget.configure(font=font)
+            self._right_viewer.line_numbers_widget.configure(font=font)
 
     # ------------------------------------------------------------------
     # Files panel helpers

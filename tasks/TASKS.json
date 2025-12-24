@@ -554,7 +554,7 @@
     },
     {
       "id": "T-033",
-      "status": "to do",
+      "status": "complete",
       "title": "Implement 'Increase Font Size' menu item",
       "description": "Implement the 'View > Increase Font Size' menu item to increase the font size in the text viewers.",
       "depends_on": ["T-015"],
@@ -565,7 +565,7 @@
     },
     {
       "id": "T-034",
-      "status": "to do",
+      "status": "complete",
       "title": "Implement 'Decrease Font Size' menu item",
       "description": "Implement the 'View > Decrease Font Size' menu item to decrease the font size in the text viewers.",
       "depends_on": ["T-015"],
@@ -576,7 +576,7 @@
     },
     {
       "id": "T-035",
-      "status": "to do",
+      "status": "complete",
       "title": "Implement 'Toggle Line Wrapping' menu item",
       "description": "Implement the 'View > Toggle Line Wrapping' menu item to enable or disable line wrapping in the text viewers.",
       "depends_on": ["T-015"],
