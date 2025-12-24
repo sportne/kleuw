@@ -239,6 +239,8 @@ class KleuwGUI:
         self._files: list[str] = []
         self._file_listbox: Any | None = None
         self._files_frame: Any | None = None
+        self._links_frame: Any | None = None
+        self._main_container: Any | None = None
         self._upper_paned_window: Any | None = None
         self._left_viewer: ViewerPane | None = None
         self._right_viewer: ViewerPane | None = None
@@ -280,6 +282,7 @@ class KleuwGUI:
             "Redo": self._redo,
             "Preferences": self._open_preferences_dialog,
             "Toggle Files Panel": self._toggle_files_panel,
+            "Toggle Links Panel": self._toggle_links_panel,
         }
         return callbacks.get(action, partial(self._placeholder_action, action))
 
@@ -319,6 +322,7 @@ class KleuwGUI:
     def _build_layout(self) -> None:
         container = self._ttk.PanedWindow(self.root, orient=self._tk.VERTICAL)
         container.pack(fill=self._tk.BOTH, expand=True)
+        self._main_container = container
 
         upper = self._ttk.PanedWindow(container, orient=self._tk.HORIZONTAL)
         container.add(upper, weight=3)
@@ -336,6 +340,7 @@ class KleuwGUI:
         links_frame = self._ttk.Frame(container, padding=8)
         self._build_links_panel(links_frame)
         container.add(links_frame, weight=1)
+        self._links_frame = links_frame
 
     def _build_files_panel(self, parent: Any) -> None:
         self._ttk.Label(
@@ -1012,6 +1017,16 @@ class KleuwGUI:
             self._upper_paned_window.remove(self._files_frame)
         else:
             self._upper_paned_window.insert(0, self._files_frame, weight=1)
+
+    def _toggle_links_panel(self) -> None:
+        """Show or hide the links panel."""
+        if self._links_frame is None or self._main_container is None:
+            return
+        panes = self._main_container.panes()
+        if self._links_frame.winfo_exists() and str(self._links_frame) in panes:
+            self._main_container.remove(self._links_frame)
+        else:
+            self._main_container.add(self._links_frame, weight=1)
 
     # ------------------------------------------------------------------
     # Files panel helpers
