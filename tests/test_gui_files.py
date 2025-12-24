@@ -6,6 +6,7 @@ from collections.abc import Callable, Sequence
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -13,7 +14,12 @@ from kleuw.gui import KleuwGUI
 from kleuw.hashing import compute_region_hash
 from kleuw.model import LineSpan, Link, LinkType, Target
 from kleuw.project import Project
-from tests._gui_stubs import StubMessageBox, StubRoot, StubStringVar
+from tests._gui_stubs import (
+    StubMessageBox,
+    StubRoot,
+    StubStringVar,
+    _create_fake_menu,
+)
 
 
 class _BaseWidget:
@@ -34,27 +40,6 @@ class _BaseWidget:
         self._bindings[sequence] = callback
 
     def destroy(self) -> None:  # pragma: no cover - tooltip helper
-        return None
-
-
-class _FakeMenu(_BaseWidget):
-    def __init__(self, *_args: Any, **_kwargs: Any) -> None:
-        super().__init__()
-        self.commands: list[tuple[str | None, Callable[..., Any] | None]] = []
-
-    def add_command(self, *, label: str, command: Callable[..., Any]) -> None:
-        self.commands.append((label, command))
-
-    def add_separator(self) -> None:
-        self.commands.append((None, None))
-
-    def add_cascade(self, *, label: str, menu: Any) -> None:
-        self.commands.append((label, menu))
-
-    def tk_popup(self, *_args: Any, **_kwargs: Any) -> None:  # pragma: no cover - noop
-        return None
-
-    def grab_release(self) -> None:  # pragma: no cover - noop
         return None
 
 
@@ -374,7 +359,7 @@ def functional_tk_module() -> SimpleNamespace:
     module.DISABLED = "disabled"
     module.NORMAL = "normal"
     module.SUNKEN = "sunken"
-    module.Menu = _FakeMenu
+    module.Menu = MagicMock(name="Menu", side_effect=_create_fake_menu)
     module.Listbox = _FakeListbox
     module.Text = _FakeText
     module.Scrollbar = _FakeScrollbar

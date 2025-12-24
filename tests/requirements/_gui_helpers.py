@@ -5,10 +5,16 @@ from __future__ import annotations
 from collections.abc import Callable
 from types import SimpleNamespace
 from typing import Any
+from unittest.mock import MagicMock
 
 from kleuw.gui import KleuwGUI
 from kleuw.project import Project
-from tests._gui_stubs import StubMessageBox, StubRoot, StubStringVar
+from tests._gui_stubs import (
+    StubMessageBox,
+    StubRoot,
+    StubStringVar,
+    _create_fake_menu,
+)
 from tests.test_gui_files import (
     _FakeButton,
     _FakeCombobox,
@@ -16,7 +22,6 @@ from tests.test_gui_files import (
     _FakeFrame,
     _FakeLabel,
     _FakeListbox,
-    _FakeMenu,
     _FakePanedWindow,
     _FakeScrollbar,
     _FakeSeparator,
@@ -47,7 +52,7 @@ def build_functional_tk_module() -> SimpleNamespace:
     module.DISABLED = "disabled"
     module.NORMAL = "normal"
     module.SUNKEN = "sunken"
-    module.Menu = _FakeMenu
+    module.Menu = MagicMock(name="Menu", side_effect=_create_fake_menu)
     module.Listbox = _FakeListbox
     module.Text = _FakeText
     module.Scrollbar = _FakeScrollbar
