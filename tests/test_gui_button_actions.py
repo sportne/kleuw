@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -99,12 +98,20 @@ def test_edit_selected_link_opens_dialog(
 ) -> None:
     """The 'Edit Link' action should open the edit dialog for the selected link."""
     project = Project(
-        links=[{"id": "L1", "type": "implements", "src": {"path": "a"}, "dst": {"path": "b"}}]
+        links=[
+            {
+                "id": "L1",
+                "type": "implements",
+                "src": {"path": "a"},
+                "dst": {"path": "b"},
+            }
+        ]
     )
     gui, _ = _make_gui(gui_stubs, project=project)
 
     # Mock the dialog opening method
     dialog_opened = False
+
     def mock_open_edit_dialog(link_entry):
         nonlocal dialog_opened
         dialog_opened = True
