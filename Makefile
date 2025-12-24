@@ -10,6 +10,7 @@ PACKAGE     := kleuw
     format format-check \
     lint typecheck \
     test coverage gui-test \
+    package clean \
     ci
 
 help:
@@ -22,6 +23,8 @@ help:
 	@echo "  make test          - Run unit tests"
 	@echo "  make coverage      - Run unit tests with coverage threshold"
 	@echo "  make gui-test      - Run GUI-marked tests"
+	@echo "  make package       - Build a source distribution and wheel"
+	@echo "  make clean         - Remove build artifacts"
 	@echo "  make ci            - Run all phase checks (convenience target)"
 
 install-dev:
@@ -56,6 +59,17 @@ coverage:
 
 gui-test:
 	$(PYTHON) -m pytest -m gui
+
+# ----- Packaging -----
+
+package:
+	@echo "Building source distribution and wheel..."
+	$(PYTHON) -m pip install --upgrade build
+	$(PYTHON) -m build
+
+clean:
+	@echo "Cleaning up build artifacts..."
+	rm -rf build dist *.egg-info
 
 # ----- Convenience Target -----
 

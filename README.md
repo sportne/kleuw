@@ -138,6 +138,8 @@ make typecheck
 make test
 make coverage
 make gui-test
+make package
+make clean
 ```
 
 ---
