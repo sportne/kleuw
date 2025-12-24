@@ -91,3 +91,22 @@ class CreateLinkCommand(Command[dict[str, Any]]):
     def undo(self) -> None:
         """Remove the link from the project."""
         self._project.remove_link(self._link_id)
+
+
+class DeleteLinkCommand(Command[dict[str, Any]]):
+    """A command to delete a link from a project."""
+
+    def __init__(self, project: Project, link_id: str) -> None:
+        self._project = project
+        self._link_id = link_id
+        self._link_data: dict[str, Any] | None = None
+
+    def execute(self) -> dict[str, Any] | None:
+        """Remove the link from the project."""
+        self._link_data = self._project.remove_link(self._link_id)
+        return self._link_data
+
+    def undo(self) -> None:
+        """Add the link back to the project."""
+        if self._link_data is not None:
+            self._project.add_link(self._link_data)

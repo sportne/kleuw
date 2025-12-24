@@ -15,7 +15,7 @@ from pathlib import Path
 from tkinter import filedialog, messagebox, ttk
 from typing import Any
 
-from kleuw.commands import CommandHistory, CreateLinkCommand
+from kleuw.commands import CommandHistory, CreateLinkCommand, DeleteLinkCommand
 from kleuw.hashing import compute_region_hash
 from kleuw.io import load_project, save_project
 from kleuw.model import HashDigest, LineSpan, Link, LinkType, RegionHash, Target
@@ -1411,12 +1411,18 @@ class KleuwGUI:
         if self._links_tree is None:
             return
         selection = self._links_tree.selection()
-        removed = False
+        if not selection:
+            return
+
+        removed_count = 0
         for item_id in selection:
             link_id = str(item_id)
-            if self._project.remove_link(link_id) is not None:
-                removed = True
-        if removed:
+            command = DeleteLinkCommand(self._project, link_id)
+            result = self._command_history.execute(command)
+            if result is not None:
+                removed_count += 1
+
+        if removed_count > 0:
             self._set_dirty(True)
             self._refresh_links_panel()
 

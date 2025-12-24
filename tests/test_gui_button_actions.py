@@ -208,3 +208,38 @@ def test_create_link_with_duplicate_id_shows_error(
 
     assert len(messagebox.error_calls) == 1
     assert "already exists" in messagebox.error_calls[0][1]
+
+
+def test_delete_link_undo_redo(gui_stubs: SimpleNamespace) -> None:
+    """Test deleting a link and then undoing and redoing the action."""
+    project = Project(
+        links=[
+            {
+                "id": "L1",
+                "type": "implements",
+                "src": {"path": "a"},
+                "dst": {"path": "b"},
+            }
+        ]
+    )
+    gui, _ = _make_gui(gui_stubs, project=project)
+
+    assert len(project.links) == 1
+
+    # Simulate selecting the link
+    assert gui._links_tree is not None
+    gui._links_tree.selection.return_value = ("L1",)
+
+    # Delete the link
+    gui._delete_selected_links()
+    assert len(project.links) == 0
+
+    # Undo the deletion
+    gui._undo()
+    assert len(project.links) == 1
+    assert project.find_link_by_id("L1") is not None
+
+    # Redo the deletion
+    gui._redo()
+    assert len(project.links) == 0
+    assert project.find_link_by_id("L1") is None
