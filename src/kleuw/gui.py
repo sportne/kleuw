@@ -228,6 +228,7 @@ class KleuwGUI:
         self.root.title("Kleuw")
         self.root.geometry("1200x800")
         self.root.minsize(1024, 640)
+        self.root.protocol("WM_DELETE_WINDOW", self._exit_app)
 
         self.project_path_var = self._tk.StringVar(value="No project loaded")
         self.dirty_var = self._tk.StringVar(value="● Clean")
@@ -264,6 +265,7 @@ class KleuwGUI:
             "Open Project": self._open_project,
             "Save": self._save_project,
             "Save As": self._save_project_as,
+            "Exit": self._exit_app,
             "Add File": self._add_files,
             "Check Staleness": self._run_staleness_check,
             "Create Link": self._create_link,
@@ -926,6 +928,10 @@ class KleuwGUI:
         self._messagebox.showinfo(
             title="Kleuw", message=f"{action} is not implemented yet."
         )
+
+    def _exit_app(self) -> None:
+        if self._confirm_discard_changes():
+            self.root.destroy()
 
     # ------------------------------------------------------------------
     # Files panel helpers

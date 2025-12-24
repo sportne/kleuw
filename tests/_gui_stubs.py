@@ -54,6 +54,9 @@ class StubRoot:
     def bind(self, sequence: str, handler: Any) -> None:
         self.bindings.append((sequence, handler))
 
+    def protocol(self, name: str, handler: Any) -> None:
+        self.bindings.append((name, handler))
+
     def mainloop(self) -> None:  # pragma: no cover - not exercised in tests
         return None
 
