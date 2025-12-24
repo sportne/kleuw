@@ -132,6 +132,7 @@ def build_stub_tk_module() -> SimpleNamespace:
     module.VERTICAL = "vertical"
     module.HORIZONTAL = "horizontal"
     module.NONE = "none"
+    module.WORD = "word"
     module.DISABLED = "disabled"
     module.NORMAL = "normal"
     module.SUNKEN = "sunken"
