@@ -289,7 +289,6 @@ class KleuwGUI:
             "Undo": self._undo,
             "Redo": self._redo,
             "Edit Link": self._edit_selected_link,
-            "Delete Link": self._delete_selected_links,
             "Preferences": self._open_preferences_dialog,
             "Toggle Files Panel": self._toggle_files_panel,
             "Toggle Links Panel": self._toggle_links_panel,
@@ -1500,6 +1499,21 @@ class KleuwGUI:
                 if isinstance(candidate, str) and candidate:
                     return candidate
         return None
+
+    def _edit_selected_link(self) -> None:
+        if self._links_tree is None:
+            return
+        selection = self._links_tree.selection()
+        if not selection:
+            return
+        link_id = str(selection[0])
+        link_entry = self._project.find_link_by_id(link_id)
+        if link_entry is None:
+            self._messagebox.showerror(
+                title="Kleuw", message=f"Link '{link_id}' no longer exists."
+            )
+            return
+        self._open_edit_dialog(link_entry)
 
     def _delete_selected_links(self) -> None:
         if self._links_tree is None:

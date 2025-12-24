@@ -103,6 +103,7 @@ def test_edit_link_dialog_integration(gui_stubs: SimpleNamespace, monkeypatch) -
 
     monkeypatch.setattr(gui, "_apply_link_edit", spy_apply_link_edit)
 
+
     # Simulate selecting a link in the tree
     assert gui._links_tree is not None
     gui._links_tree.selection.return_value = ("L1",)
