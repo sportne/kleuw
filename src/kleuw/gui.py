@@ -276,6 +276,7 @@ class KleuwGUI:
             "Create Link": self._create_link,
             "Undo": self._undo,
             "Redo": self._redo,
+            "Preferences": self._open_preferences_dialog,
         }
         return callbacks.get(action, partial(self._placeholder_action, action))
 
@@ -975,6 +976,27 @@ class KleuwGUI:
     def _exit_app(self) -> None:
         if self._confirm_discard_changes():
             self.root.destroy()
+
+    def _open_preferences_dialog(self) -> None:
+        """Open the preferences dialog."""
+        dialog = self._tk.Toplevel(self.root)
+        dialog.title("Preferences")
+        dialog.transient(self.root)
+        dialog.grab_set()
+
+        content = self._ttk.Frame(dialog, padding=12)
+        content.pack(fill=self._tk.BOTH, expand=True)
+
+        self._ttk.Label(content, text="Preferences are not yet implemented.").pack(
+            anchor=self._tk.W, pady=(0, 12)
+        )
+
+        button_row = self._ttk.Frame(content)
+        button_row.pack(fill=self._tk.X, anchor=self._tk.E)
+
+        ok_button = self._ttk.Button(button_row, text="OK", command=dialog.destroy)
+        ok_button.pack(side=self._tk.LEFT)
+        ok_button.focus_set()
 
     # ------------------------------------------------------------------
     # Files panel helpers

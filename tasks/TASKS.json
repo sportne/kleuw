@@ -521,7 +521,7 @@
     },
     {
       "id": "T-030",
-      "status": "to do",
+      "status": "complete",
       "title": "Implement 'Preferences' menu item",
       "description": "Implement the 'Edit > Preferences' menu item to open a preferences dialog.",
       "depends_on": ["T-014"],
