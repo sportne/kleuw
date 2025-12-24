@@ -477,7 +477,7 @@
     },
     {
       "id": "T-026",
-      "status": "to do",
+      "status": "complete",
       "title": "Implement 'Exit' menu item",
       "description": "Implement the 'File > Exit' menu item to close the application, prompting to save unsaved changes.",
       "depends_on": ["T-014"],

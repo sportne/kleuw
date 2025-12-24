@@ -264,6 +264,7 @@ class KleuwGUI:
             "Open Project": self._open_project,
             "Save": self._save_project,
             "Save As": self._save_project_as,
+            "Exit": self._exit_app,
             "Add File": self._add_files,
             "Check Staleness": self._run_staleness_check,
             "Create Link": self._create_link,
@@ -926,6 +927,10 @@ class KleuwGUI:
         self._messagebox.showinfo(
             title="Kleuw", message=f"{action} is not implemented yet."
         )
+
+    def _exit_app(self) -> None:
+        if self._confirm_discard_changes():
+            self.root.destroy()
 
     # ------------------------------------------------------------------
     # Files panel helpers
