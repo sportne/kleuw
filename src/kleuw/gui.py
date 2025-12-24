@@ -86,6 +86,7 @@ MENU_DEFINITION: tuple[tuple[str, Sequence[MenuItem]], ...] = (
     (
         "View",
         (
+            MenuItem("Toggle Files Panel", "Show or hide the files panel."),
             MenuItem("Toggle Links Panel", "Show or hide the links panel."),
             MenuItem("Increase Font Size", "Make the viewers' font larger."),
             MenuItem("Decrease Font Size", "Make the viewers' font smaller."),
@@ -298,11 +299,6 @@ class KleuwGUI:
                         label=item.label,
                         command=self._get_action_callback(item.label),
                     )
-            if menu_label == "View":
-                menu.add_command(
-                    label="Toggle Files Panel",
-                    command=self._get_action_callback("Toggle Files Panel"),
-                )
             menu_bar.add_cascade(label=menu_label, menu=menu)
         self.root.config(menu=menu_bar)
 
