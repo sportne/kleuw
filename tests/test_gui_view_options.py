@@ -6,7 +6,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from kleuw.gui import KleuwGUI, _DEFAULT_FONT_SIZE, _MAX_FONT_SIZE, _MIN_FONT_SIZE
+from kleuw.gui import _MAX_FONT_SIZE, _MIN_FONT_SIZE, KleuwGUI
 from tests._gui_stubs import (
     StubMessageBox,
     StubRoot,
