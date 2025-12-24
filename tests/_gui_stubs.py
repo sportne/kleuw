@@ -84,6 +84,7 @@ def build_stub_tk_module() -> SimpleNamespace:
     module.LEFT = "left"
     module.RIGHT = "right"
     module.W = "west"
+    module.E = "east"
     module.TOP = "top"
     module.BOTTOM = "bottom"
     module.X = "x"
