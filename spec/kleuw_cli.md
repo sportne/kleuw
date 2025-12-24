@@ -155,8 +155,8 @@ Creates a new link between two targets.
 kleuw list-links <project.json> [--stale-only] [--type RELTYPE]
 ```
 
-Lists all or filtered links. The command recomputes staleness only when
-`--stale-only` is provided; JSON output always mirrors the stored link entries.
+Lists all or filtered links. The command recomputes staleness for display in
+the table; JSON output always mirrors the stored link entries.
 
 **Options:**
 
