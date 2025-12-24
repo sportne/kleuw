@@ -264,6 +264,7 @@ class KleuwGUI:
             "Open Project": self._open_project,
             "Save": self._save_project,
             "Save As": self._save_project_as,
+            "Add File": self._add_files,
             "Check Staleness": self._run_staleness_check,
             "Create Link": self._create_link,
         }
