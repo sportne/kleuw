@@ -7,6 +7,7 @@ redo operations in the Kleuw GUI.
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from copy import deepcopy
 from typing import TYPE_CHECKING, Any, Generic, TypeVar
 
 if TYPE_CHECKING:
@@ -110,3 +111,37 @@ class DeleteLinkCommand(Command[dict[str, Any]]):
         """Add the link back to the project."""
         if self._link_data is not None:
             self._project.add_link(self._link_data)
+
+
+class UpdateLinkCommand(Command[dict[str, Any]]):
+    """A command to update the data of an existing link."""
+
+    def __init__(
+        self,
+        project: Project,
+        link_id: str,
+        *,
+        updates: dict[str, Any],
+    ) -> None:
+        self._project = project
+        self._link_id = link_id
+        self._updates = updates
+        self._original_data: dict[str, Any] | None = None
+
+    def execute(self) -> dict[str, Any] | None:
+        """Apply the updates to the link."""
+        link = self._project.find_link_by_id(self._link_id)
+        if link is None:
+            return None
+        self._original_data = deepcopy(link)
+        link.update(self._updates)
+        return link
+
+    def undo(self) -> None:
+        """Restore the original link data."""
+        if self._original_data is None:
+            return
+        link = self._project.find_link_by_id(self._link_id)
+        if link is not None:
+            link.clear()
+            link.update(self._original_data)

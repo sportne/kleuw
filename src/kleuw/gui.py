@@ -15,7 +15,12 @@ from pathlib import Path
 from tkinter import filedialog, messagebox, ttk
 from typing import Any
 
-from kleuw.commands import CommandHistory, CreateLinkCommand, DeleteLinkCommand
+from kleuw.commands import (
+    CommandHistory,
+    CreateLinkCommand,
+    DeleteLinkCommand,
+    UpdateLinkCommand,
+)
 from kleuw.hashing import compute_region_hash
 from kleuw.io import load_project, save_project
 from kleuw.model import HashDigest, LineSpan, Link, LinkType, RegionHash, Target
@@ -1597,29 +1602,25 @@ class KleuwGUI:
         tags_text: str,
         note_text: str,
     ) -> None:
-        link_entry = self._project.find_link_by_id(link_id)
-        if link_entry is None:
-            self._messagebox.showerror(
-                title="Kleuw", message=f"Link '{link_id}' no longer exists."
-            )
-            return
         try:
-            link_entry["type"] = LinkType(type_value).value
+            link_type = LinkType(type_value).value
         except ValueError:
             self._messagebox.showerror(
                 title="Kleuw", message=f"Unknown relationship type '{type_value}'."
             )
             return
+
+        updates: dict[str, Any] = {"type": link_type}
         tags = [tag.strip() for tag in tags_text.split(",") if tag.strip()]
-        if tags:
-            link_entry["tags"] = tags
-        elif "tags" in link_entry:
-            del link_entry["tags"]
+        updates["tags"] = tags
         note = note_text.strip()
         if note:
-            link_entry["note"] = note
-        elif "note" in link_entry:
-            del link_entry["note"]
+            updates["note"] = note
+        elif "note" in self._project.find_link_by_id(link_id) or {}:
+            updates["note"] = ""
+
+        command = UpdateLinkCommand(self._project, link_id, updates=updates)
+        self._command_history.execute(command)
         self._set_dirty(True)
         self._refresh_links_panel(selected_id=link_id)
 
