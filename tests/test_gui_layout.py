@@ -96,3 +96,42 @@ def test_gui_toggles_files_panel_visibility(
     assert str(files_frame) in panes_after_show
     assert len(panes_after_show) == 2
     assert panes_after_show[0] == str(files_frame)
+
+
+def test_gui_toggles_links_panel_visibility(
+    stub_tk_module: SimpleNamespace,
+    stub_ttk_module: SimpleNamespace,
+    stub_messagebox: StubMessageBox,
+) -> None:
+    """The links panel should be hidden and shown when toggled."""
+
+    root = StubRoot()
+    gui = KleuwGUI(
+        root=root,
+        tk_module=stub_tk_module,
+        ttk_module=stub_ttk_module,
+        messagebox_module=stub_messagebox,
+        enable_tooltips=False,
+    )
+
+    main_container = gui._main_container
+    assert main_container is not None
+    links_frame = gui._links_frame
+    assert links_frame is not None
+
+    # Initially, the links panel should be present.
+    initial_panes = main_container.panes()
+    assert str(links_frame) in initial_panes
+    assert len(initial_panes) == 2
+
+    # Hide the panel.
+    gui._toggle_links_panel()
+    panes_after_hide = main_container.panes()
+    assert str(links_frame) not in panes_after_hide
+    assert len(panes_after_hide) == 1
+
+    # Show the panel again.
+    gui._toggle_links_panel()
+    panes_after_show = main_container.panes()
+    assert str(links_frame) in panes_after_show
+    assert len(panes_after_show) == 2
