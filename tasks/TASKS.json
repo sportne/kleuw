@@ -510,7 +510,7 @@
     },
     {
       "id": "T-029",
-      "status": "to do",
+      "status": "complete",
       "title": "Implement 'Delete Link' menu items",
       "description": "Implement the 'Edit > Delete Link' and 'Links > Delete Link' menu items to delete the selected link(s) in the links panel.",
       "depends_on": ["T-017"],
