@@ -532,7 +532,7 @@
     },
     {
       "id": "T-031",
-      "status": "to do",
+      "status": "complete",
       "title": "Implement 'Toggle Files Panel' menu item",
       "description": "Implement the 'View > Toggle Files Panel' menu item to show or hide the files panel.",
       "depends_on": ["T-014"],
