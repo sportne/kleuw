@@ -29,6 +29,33 @@ def _create_fake_menu(*_args: Any, **_kwargs: Any) -> MagicMock:
     return menu
 
 
+def _create_fake_paned_window(*_args: Any, **_kwargs: Any) -> MagicMock:
+    """Factory for a MagicMock that quacks like a Tkinter PanedWindow."""
+    window = MagicMock(name="FakePanedWindow")
+    _internal_panes: list[str] = []
+
+    def _panes_method() -> list[str]:
+        return _internal_panes.copy()
+
+    def _add_method(widget: Any, **_kwargs: Any) -> None:
+        _internal_panes.append(str(widget))
+
+    def _insert_method(index: int, widget: Any, **_kwargs: Any) -> None:
+        _internal_panes.insert(index, str(widget))
+
+    def _remove_method(widget: Any) -> None:
+        try:
+            _internal_panes.remove(str(widget))
+        except ValueError:
+            pass  # Mimic Tkinter's behavior for unknown panes
+
+    window.panes = MagicMock(name="panes", side_effect=_panes_method)
+    window.add = MagicMock(name="add", side_effect=_add_method)
+    window.insert = MagicMock(name="insert", side_effect=_insert_method)
+    window.remove = MagicMock(name="remove", side_effect=_remove_method)
+    return window
+
+
 class StubStringVar:
     """Minimal replacement for ``tkinter.StringVar``."""
 
@@ -127,7 +154,9 @@ def build_stub_ttk_module() -> SimpleNamespace:
     module.Frame = _make_widget_factory("Frame")
     module.Button = _make_widget_factory("Button")
     module.Label = _make_widget_factory("Label")
-    module.PanedWindow = _make_widget_factory("PanedWindow")
+    module.PanedWindow = MagicMock(
+        name="PanedWindow", side_effect=_create_fake_paned_window
+    )
     module.Scrollbar = _make_widget_factory("TtkScrollbar")
     module.Combobox = _make_widget_factory("Combobox")
     module.Treeview = _make_widget_factory("Treeview")
