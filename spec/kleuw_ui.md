@@ -94,9 +94,8 @@ Status Bar (project path, dirty flag, selection summary)
 * About
 * Keyboard Shortcuts
 
-Except for the “Create Link” and “Check Staleness” actions under the **Links** menu,
-all items currently trigger a placeholder dialog informing the user that the
-feature is not yet implemented.
+With the exception of a few view- and edit-related toggles, all menu actions
+now trigger real callbacks.
 
 ---
 
