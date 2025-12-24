@@ -466,7 +466,7 @@
     },
     {
       "id": "T-025",
-      "status": "to do",
+      "status": "complete",
       "title": "Implement 'Recent Projects' menu item",
       "description": "Implement the 'File > Recent Projects' menu item to display a list of recently opened projects and allow the user to open them.",
       "depends_on": ["T-014"],

@@ -19,6 +19,16 @@ def _make_widget_factory(name: str) -> MagicMock:
     return MagicMock(name=name, side_effect=lambda *args, **kwargs: MagicMock())
 
 
+def _create_fake_menu(*_args: Any, **_kwargs: Any) -> MagicMock:
+    """Factory for a MagicMock that quacks like a Tkinter menu."""
+    menu = MagicMock(name="FakeMenu")
+    menu.delete = MagicMock(name="menu.delete")
+    menu.add_command = MagicMock(name="menu.add_command")
+    menu.add_cascade = MagicMock(name="menu.add_cascade")
+    menu.add_separator = MagicMock(name="menu.add_separator")
+    return menu
+
+
 class StubStringVar:
     """Minimal replacement for ``tkinter.StringVar``."""
 
@@ -98,7 +108,7 @@ def build_stub_tk_module() -> SimpleNamespace:
     module.DISABLED = "disabled"
     module.NORMAL = "normal"
     module.SUNKEN = "sunken"
-    module.Menu = _make_widget_factory("Menu")
+    module.Menu = MagicMock(name="Menu", side_effect=_create_fake_menu)
     module.Listbox = _make_widget_factory("Listbox")
     text_widget_mock = MagicMock()
     text_widget_mock.get.return_value = "hello\nworld"

@@ -246,6 +246,8 @@ class KleuwGUI:
         self._staleness_summary: tuple[int, int] | None = None
         self._show_stale_only = False
         self._link_tooltip: Tooltip | None = None
+        self._recent_projects: list[str] = []
+        self._recent_projects_menu: Any | None = None
 
         style = self._ttk.Style()
         style.configure("Tooltip.TLabel", background="#ffffe0")
@@ -256,6 +258,7 @@ class KleuwGUI:
         self._build_status_bar()
         self._bind_shortcuts()
         self._update_selection_summary()
+        self._update_recent_projects_menu()
 
     def _get_action_callback(self, action: str) -> Callable[[], None]:
         callbacks: dict[str, Callable[[], None]] = {
@@ -280,10 +283,14 @@ class KleuwGUI:
                 if item.label is None:
                     menu.add_separator()
                     continue
-                menu.add_command(
-                    label=item.label,
-                    command=self._get_action_callback(item.label),
-                )
+                if item.label == "Recent Projects":
+                    self._recent_projects_menu = self._tk.Menu(menu, tearoff=False)
+                    menu.add_cascade(label=item.label, menu=self._recent_projects_menu)
+                else:
+                    menu.add_command(
+                        label=item.label,
+                        command=self._get_action_callback(item.label),
+                    )
             menu_bar.add_cascade(label=menu_label, menu=menu)
         self.root.config(menu=menu_bar)
 
@@ -578,8 +585,15 @@ class KleuwGUI:
             title="Open Kleuw Project",
             filetypes=(("Kleuw JSON", "*.json"), ("All files", "*.*")),
         )
-        if not path:
-            return
+        if path:
+            self._load_project_from_path(path)
+
+    def _open_recent_project(self, path: str) -> None:
+        """Open a project from the recent projects list."""
+        if self._confirm_discard_changes():
+            self._load_project_from_path(path)
+
+    def _load_project_from_path(self, path: str) -> None:
         try:
             project = load_project(path)
         except (OSError, ValueError) as exc:
@@ -599,6 +613,7 @@ class KleuwGUI:
         if self._file_listbox:
             for file_path in self._files:
                 self._file_listbox.insert(self._tk.END, file_path)
+        self._add_to_recent_projects(path)
 
     def _save_project(self) -> None:
         if self._project_path is None:
@@ -765,6 +780,30 @@ class KleuwGUI:
             if self._show_stale_only:
                 text += " (filtered)"
         self.staleness_var.set(text)
+
+    def _add_to_recent_projects(self, path: str) -> None:
+        """Add a path to the recent projects list and update the menu."""
+        if path in self._recent_projects:
+            self._recent_projects.remove(path)
+        self._recent_projects.insert(0, path)
+        if len(self._recent_projects) > 10:
+            self._recent_projects = self._recent_projects[:10]
+        self._update_recent_projects_menu()
+
+    def _update_recent_projects_menu(self) -> None:
+        """Populate the 'Recent Projects' menu."""
+        if self._recent_projects_menu is None:
+            return
+        menu = self._recent_projects_menu
+        menu.delete(0, self._tk.END)
+        if not self._recent_projects:
+            menu.add_command(label="No recent projects", state=self._tk.DISABLED)
+        else:
+            for path in self._recent_projects:
+                menu.add_command(
+                    label=path,
+                    command=partial(self._open_recent_project, path),
+                )
 
     @property
     def _relationship_values(self) -> tuple[str, ...]:
