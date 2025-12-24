@@ -8,7 +8,7 @@ This file defines the required behavior for **AI agents** contributing to the **
 * Do **not** add new runtime dependencies. Standard library only.
 * Match existing patterns; avoid redesigns or architectural changes.
 * Keep changes small, explicit, and fully typed.
-* Run all formatting, linting, typing, and testing checks before submitting work.
+* Run `make ci` to run all formatting, linting, typing, and testing checks before submitting work.
 
 ## Required Tools & Checks
 
