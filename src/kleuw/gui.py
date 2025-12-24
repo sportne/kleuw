@@ -288,6 +288,8 @@ class KleuwGUI:
             "Create Link": self._create_link,
             "Undo": self._undo,
             "Redo": self._redo,
+            "Edit Link": self._edit_selected_link,
+            "Delete Link": self._delete_selected_links,
             "Preferences": self._open_preferences_dialog,
             "Toggle Files Panel": self._toggle_files_panel,
             "Toggle Links Panel": self._toggle_links_panel,
@@ -1603,13 +1605,12 @@ class KleuwGUI:
             )
             return
         try:
-            normalized_type = LinkType(type_value).value
+            link_entry["type"] = LinkType(type_value).value
         except ValueError:
             self._messagebox.showerror(
                 title="Kleuw", message=f"Unknown relationship type '{type_value}'."
             )
             return
-        link_entry["type"] = normalized_type
         tags = [tag.strip() for tag in tags_text.split(",") if tag.strip()]
         if tags:
             link_entry["tags"] = tags

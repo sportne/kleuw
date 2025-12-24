@@ -587,7 +587,7 @@
     },
     {
       "id": "T-036",
-      "status": "to do",
+      "status": "complete",
       "title": "Implement 'Edit Link' menu item",
       "description": "Implement the 'Links > Edit Link' menu item to open the edit dialog for the selected link.",
       "depends_on": ["T-017"],

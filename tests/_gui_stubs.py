@@ -163,4 +163,5 @@ def build_stub_ttk_module() -> SimpleNamespace:
     module.Treeview = _make_widget_factory("Treeview")
     module.Separator = _make_widget_factory("Separator")
     module.Style = MagicMock(side_effect=lambda *args, **kwargs: MagicMock())
+    module.Entry = _make_widget_factory("Entry")
     return module
