@@ -122,10 +122,12 @@ class UpdateLinkCommand(Command[dict[str, Any]]):
         link_id: str,
         *,
         updates: dict[str, Any],
+        deletes: list[str] | None = None,
     ) -> None:
         self._project = project
         self._link_id = link_id
         self._updates = updates
+        self._deletes = deletes if deletes is not None else []
         self._original_data: dict[str, Any] | None = None
 
     def execute(self) -> dict[str, Any] | None:
@@ -135,6 +137,9 @@ class UpdateLinkCommand(Command[dict[str, Any]]):
             return None
         self._original_data = deepcopy(link)
         link.update(self._updates)
+        for key in self._deletes:
+            if key in link:
+                del link[key]
         return link
 
     def undo(self) -> None:

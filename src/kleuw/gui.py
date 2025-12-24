@@ -1611,15 +1611,23 @@ class KleuwGUI:
             return
 
         updates: dict[str, Any] = {"type": link_type}
+        deletes: list[str] = []
+
         tags = [tag.strip() for tag in tags_text.split(",") if tag.strip()]
-        updates["tags"] = tags
+        if tags:
+            updates["tags"] = tags
+        else:
+            deletes.append("tags")
+
         note = note_text.strip()
         if note:
             updates["note"] = note
-        elif "note" in self._project.find_link_by_id(link_id) or {}:
-            updates["note"] = ""
+        else:
+            deletes.append("note")
 
-        command = UpdateLinkCommand(self._project, link_id, updates=updates)
+        command = UpdateLinkCommand(
+            self._project, link_id, updates=updates, deletes=deletes
+        )
         self._command_history.execute(command)
         self._set_dirty(True)
         self._refresh_links_panel(selected_id=link_id)
