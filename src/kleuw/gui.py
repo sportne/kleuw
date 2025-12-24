@@ -228,6 +228,7 @@ class KleuwGUI:
         self.root.title("Kleuw")
         self.root.geometry("1200x800")
         self.root.minsize(1024, 640)
+        self.root.protocol("WM_DELETE_WINDOW", self._exit_app)
 
         self.project_path_var = self._tk.StringVar(value="No project loaded")
         self.dirty_var = self._tk.StringVar(value="● Clean")
