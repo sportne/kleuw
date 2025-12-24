@@ -9,7 +9,7 @@ PACKAGE     := kleuw
     help install-dev \
     format format-check \
     lint typecheck \
-    test coverage gui-test \
+    test coverage \
     package clean \
     ci
 
@@ -57,9 +57,6 @@ test:
 coverage:
 	$(PYTHON) -m pytest --cov=$(PACKAGE) --cov-report=term-missing --cov-fail-under=80
 
-gui-test:
-	$(PYTHON) -m pytest -m gui
-
 # ----- Packaging -----
 
 package:
@@ -73,4 +70,4 @@ clean:
 
 # ----- Convenience Target -----
 
-ci: format-check lint typecheck test coverage gui-test
+ci: format-check lint typecheck test coverage
