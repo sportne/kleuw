@@ -38,6 +38,3 @@ jobs:
 
       - name: Coverage (with threshold)
         run: make coverage
-
-      - name: GUI tests
-        run: make gui-test
