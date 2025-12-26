@@ -8,6 +8,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from kleuw.gui import KleuwGUI
+from kleuw.model import LinkType
 from kleuw.project import Project
 from tests._gui_stubs import (
     StubMessageBox,
@@ -62,14 +63,14 @@ def test_edit_link_applies_changes(gui_stubs: SimpleNamespace) -> None:
     # Simulate opening the edit dialog and applying changes
     gui._apply_link_edit(
         "L1",
-        type_value="references",
+        type_value=LinkType.REFERS_TO,
         tags_text="new-tag, another-tag",
         note_text="new note",
     )
 
     link = project.find_link_by_id("L1")
     assert link is not None
-    assert link["type"] == "references"
+    assert link["type"] == LinkType.REFERS_TO
     assert link["tags"] == ["new-tag", "another-tag"]
     assert link["note"] == "new note"
     assert gui._is_dirty
@@ -116,7 +117,7 @@ def test_edit_link_dialog_integration(gui_stubs: SimpleNamespace, monkeypatch) -
     # calling the method that would be invoked by the dialog.
     gui._apply_link_edit(
         "L1",
-        type_value="references",
+        type_value=LinkType.REFERS_TO,
         tags_text="edited",
         note_text="edited note",
     )
@@ -124,7 +125,7 @@ def test_edit_link_dialog_integration(gui_stubs: SimpleNamespace, monkeypatch) -
     # Verify that the link was updated
     link = project.find_link_by_id("L1")
     assert link is not None
-    assert link["type"] == "references"
+    assert link["type"] == LinkType.REFERS_TO
     assert link["tags"] == ["edited"]
     assert link["note"] == "edited note"
     assert gui._is_dirty
