@@ -108,6 +108,14 @@ tooling.
 
 Design: **spec/kleuw_ui.md**
 
+### Launching the GUI
+
+To launch the GUI, run the following command from the root of the repository:
+
+```bash
+python3 -m kleuw.gui
+```
+
 ---
 
 # Development
