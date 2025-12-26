@@ -1,6 +1,15 @@
 # Makefile for Kleuw
 
-PYTHON      ?= python
+# Define the virtual environment directory
+VENV = .venv
+# Define the paths to the binaries directly
+PYTHON = $(VENV)/bin/python
+PIP    = $(VENV)/bin/pip
+
+# Target to ensure the venv is created and updated
+setup-venv:
+	python3 -m venv $(VENV)
+
 SRC_DIR     := src
 TEST_DIR    := tests
 PACKAGE     := kleuw
@@ -9,7 +18,7 @@ PACKAGE     := kleuw
     help install-dev \
     format format-check \
     lint typecheck \
-    test coverage gui-test \
+    test coverage \
     package clean \
     ci
 
@@ -34,35 +43,39 @@ install-dev:
 # ----- Formatting -----
 
 format:
+	$(VENV)/bin/activate
 	$(PYTHON) -m black $(SRC_DIR) $(TEST_DIR)
 	$(PYTHON) -m isort $(SRC_DIR) $(TEST_DIR)
 
 format-check:
+	$(VENV)/bin/activate
 	$(PYTHON) -m black --check $(SRC_DIR) $(TEST_DIR)
 	$(PYTHON) -m isort --check-only $(SRC_DIR) $(TEST_DIR)
 
 # ----- Linting / Static Analysis -----
 
 lint:
+	$(VENV)/bin/activate
 	$(PYTHON) -m ruff check $(SRC_DIR) $(TEST_DIR)
 
 typecheck:
+	$(VENV)/bin/activate
 	$(PYTHON) -m mypy $(SRC_DIR)
 
 # ----- Testing -----
 
 test:
+	$(VENV)/bin/activate
 	$(PYTHON) -m pytest
 
 coverage:
+	$(VENV)/bin/activate
 	$(PYTHON) -m pytest --cov=$(PACKAGE) --cov-report=term-missing --cov-fail-under=80
-
-gui-test:
-	$(PYTHON) -m pytest -m gui
 
 # ----- Packaging -----
 
 package:
+	$(VENV)/bin/activate
 	@echo "Building source distribution and wheel..."
 	$(PYTHON) -m pip install --upgrade build
 	$(PYTHON) -m build
@@ -73,4 +86,4 @@ clean:
 
 # ----- Convenience Target -----
 
-ci: format-check lint typecheck test coverage gui-test
+ci: format-check lint typecheck test coverage

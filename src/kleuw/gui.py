@@ -15,7 +15,12 @@ from pathlib import Path
 from tkinter import filedialog, messagebox, ttk
 from typing import Any
 
-from kleuw.commands import CommandHistory, CreateLinkCommand, DeleteLinkCommand
+from kleuw.commands import (
+    CommandHistory,
+    CreateLinkCommand,
+    DeleteLinkCommand,
+    UpdateLinkCommand,
+)
 from kleuw.hashing import compute_region_hash
 from kleuw.io import load_project, save_project
 from kleuw.model import HashDigest, LineSpan, Link, LinkType, RegionHash, Target
@@ -288,6 +293,7 @@ class KleuwGUI:
             "Create Link": self._create_link,
             "Undo": self._undo,
             "Redo": self._redo,
+            "Edit Link": self._edit_selected_link,
             "Preferences": self._open_preferences_dialog,
             "Toggle Files Panel": self._toggle_files_panel,
             "Toggle Links Panel": self._toggle_links_panel,
@@ -1499,6 +1505,21 @@ class KleuwGUI:
                     return candidate
         return None
 
+    def _edit_selected_link(self) -> None:
+        if self._links_tree is None:
+            return
+        selection = self._links_tree.selection()
+        if not selection:
+            return
+        link_id = str(selection[0])
+        link_entry = self._project.find_link_by_id(link_id)
+        if link_entry is None:
+            self._messagebox.showerror(
+                title="Kleuw", message=f"Link '{link_id}' no longer exists."
+            )
+            return
+        self._open_edit_dialog(link_entry)
+
     def _delete_selected_links(self) -> None:
         if self._links_tree is None:
             return
@@ -1517,21 +1538,6 @@ class KleuwGUI:
         if removed_count > 0:
             self._set_dirty(True)
             self._refresh_links_panel()
-
-    def _edit_selected_link(self) -> None:
-        if self._links_tree is None:
-            return
-        selection = self._links_tree.selection()
-        if not selection:
-            return
-        link_id = str(selection[0])
-        link_entry = self._project.find_link_by_id(link_id)
-        if link_entry is None:
-            self._messagebox.showerror(
-                title="Kleuw", message=f"Link '{link_id}' no longer exists."
-            )
-            return
-        self._open_edit_dialog(link_entry)
 
     def _open_edit_dialog(self, link_entry: dict[str, Any]) -> None:
         dialog = self._tk.Toplevel(self.root)
@@ -1596,30 +1602,33 @@ class KleuwGUI:
         tags_text: str,
         note_text: str,
     ) -> None:
-        link_entry = self._project.find_link_by_id(link_id)
-        if link_entry is None:
-            self._messagebox.showerror(
-                title="Kleuw", message=f"Link '{link_id}' no longer exists."
-            )
-            return
         try:
-            normalized_type = LinkType(type_value).value
+            link_type = LinkType(type_value).value
         except ValueError:
             self._messagebox.showerror(
                 title="Kleuw", message=f"Unknown relationship type '{type_value}'."
             )
             return
-        link_entry["type"] = normalized_type
+
+        updates: dict[str, Any] = {"type": link_type}
+        deletes: list[str] = []
+
         tags = [tag.strip() for tag in tags_text.split(",") if tag.strip()]
         if tags:
-            link_entry["tags"] = tags
-        elif "tags" in link_entry:
-            del link_entry["tags"]
+            updates["tags"] = tags
+        else:
+            deletes.append("tags")
+
         note = note_text.strip()
         if note:
-            link_entry["note"] = note
-        elif "note" in link_entry:
-            del link_entry["note"]
+            updates["note"] = note
+        else:
+            deletes.append("note")
+
+        command = UpdateLinkCommand(
+            self._project, link_id, updates=updates, deletes=deletes
+        )
+        self._command_history.execute(command)
         self._set_dirty(True)
         self._refresh_links_panel(selected_id=link_id)
 
