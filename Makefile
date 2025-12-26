@@ -5,11 +5,10 @@ VENV = .venv
 # Define the paths to the binaries directly
 PYTHON = $(VENV)/bin/python
 PIP    = $(VENV)/bin/pip
+
 # Target to ensure the venv is created and updated
-$(VENV)/bin/activate: requirements.txt
+setup-venv:
 	python3 -m venv $(VENV)
-	$(PIP) install -r requirements.txt
-	touch $(VENV)/bin/activate
 
 SRC_DIR     := src
 TEST_DIR    := tests
