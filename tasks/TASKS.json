@@ -699,7 +699,7 @@
     },
     {
       "id": "T-045",
-      "status": "incomplete",
+      "status": "complete",
       "title": "Improve keyboard navigation",
       "description": "Improve keyboard navigation to ensure all actions are accessible, as described in the accessibility section of the UI specification.",
       "depends_on": ["T-014"],
