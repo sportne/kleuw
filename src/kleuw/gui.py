@@ -92,7 +92,6 @@ MENU_DEFINITION: tuple[tuple[str, Sequence[MenuItem]], ...] = (
         (
             MenuItem("Undo", "Undo the last change."),
             MenuItem("Redo", "Redo the previously undone change."),
-            MenuItem("Delete Link", "Delete the currently selected link."),
             MenuItem("Preferences", "Open the preferences dialog."),
         ),
     ),
@@ -1109,16 +1108,54 @@ class KleuwGUI:
         content = self._ttk.Frame(dialog, padding=12)
         content.pack(fill=self._tk.BOTH, expand=True)
 
-        self._ttk.Label(content, text="Preferences are not yet implemented.").pack(
-            anchor=self._tk.W, pady=(0, 12)
+        font_size_var = self._tk.IntVar(value=self._font_size)
+        line_wrapping_var = self._tk.BooleanVar(value=self._line_wrapping_enabled)
+
+        # Font Size Setting
+        self._ttk.Label(content, text="Font Size:").grid(
+            row=0, column=0, sticky=self._tk.W, pady=(0, 4)
+        )
+        font_size_spinbox = self._ttk.Spinbox(
+            content,
+            from_=_MIN_FONT_SIZE,
+            to=_MAX_FONT_SIZE,
+            textvariable=font_size_var,
+            width=5,
+        )
+        font_size_spinbox.grid(row=0, column=1, sticky=self._tk.W, pady=(0, 4))
+
+        # Line Wrapping Setting
+        line_wrapping_check = self._ttk.Checkbutton(
+            content, text="Enable Line Wrapping", variable=line_wrapping_var
+        )
+        line_wrapping_check.grid(
+            row=1, column=0, columnspan=2, sticky=self._tk.W, pady=(0, 12)
         )
 
         button_row = self._ttk.Frame(content)
-        button_row.pack(fill=self._tk.X, anchor=self._tk.E)
+        button_row.grid(row=2, column=0, columnspan=2, sticky=self._tk.E)
 
-        ok_button = self._ttk.Button(button_row, text="OK", command=dialog.destroy)
-        ok_button.pack(side=self._tk.LEFT)
-        ok_button.focus_set()
+        def _apply() -> None:
+            self._font_size = font_size_var.get()
+            self._line_wrapping_enabled = line_wrapping_var.get()
+            self._update_font()
+            self._apply_line_wrapping()
+
+        def _save() -> None:
+            _apply()
+            dialog.destroy()
+
+        def _cancel() -> None:
+            dialog.destroy()
+
+        save_button = self._ttk.Button(button_row, text="Save", command=_save)
+        save_button.pack(side=self._tk.LEFT, padx=(0, 4))
+        cancel_button = self._ttk.Button(button_row, text="Cancel", command=_cancel)
+        cancel_button.pack(side=self._tk.LEFT, padx=(0, 4))
+        apply_button = self._ttk.Button(button_row, text="Apply", command=_apply)
+        apply_button.pack(side=self._tk.LEFT)
+
+        save_button.focus_set()
 
     def _show_about_dialog(self) -> None:
         """Show the 'About' dialog."""
@@ -1222,14 +1259,18 @@ class KleuwGUI:
         self._font_size = max(_MIN_FONT_SIZE, self._font_size - 1)
         self._update_font()
 
-    def _toggle_line_wrapping(self) -> None:
-        """Toggle line wrapping in both viewers."""
-        self._line_wrapping_enabled = not self._line_wrapping_enabled
+    def _apply_line_wrapping(self) -> None:
+        """Apply the current line wrapping setting to both viewers."""
         wrap_mode = self._tk.WORD if self._line_wrapping_enabled else self._tk.NONE
         if self._left_viewer:
             self._left_viewer.text_widget.configure(wrap=wrap_mode)
         if self._right_viewer:
             self._right_viewer.text_widget.configure(wrap=wrap_mode)
+
+    def _toggle_line_wrapping(self) -> None:
+        """Toggle line wrapping in both viewers."""
+        self._line_wrapping_enabled = not self._line_wrapping_enabled
+        self._apply_line_wrapping()
 
     def _update_font(self) -> None:
         """Apply the current font size to both viewers."""

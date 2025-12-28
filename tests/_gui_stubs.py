@@ -69,6 +69,32 @@ class StubStringVar:
         return self._value
 
 
+class StubIntVar:
+    """Minimal replacement for ``tkinter.IntVar``."""
+
+    def __init__(self, value: int = 0) -> None:
+        self._value = value
+
+    def set(self, value: int) -> None:
+        self._value = value
+
+    def get(self) -> int:
+        return self._value
+
+
+class StubBooleanVar:
+    """Minimal replacement for ``tkinter.BooleanVar``."""
+
+    def __init__(self, value: bool = False) -> None:
+        self._value = value
+
+    def set(self, value: bool) -> None:
+        self._value = value
+
+    def get(self) -> bool:
+        return self._value
+
+
 class StubRoot:
     """Headless replacement for ``tkinter.Tk`` used in tests."""
 
@@ -149,6 +175,10 @@ def build_stub_tk_module() -> SimpleNamespace:
     module.Scrollbar = _make_widget_factory("Scrollbar")
     module.Toplevel = _make_widget_factory("Toplevel")
     module.StringVar = MagicMock(side_effect=lambda value="", **_: StubStringVar(value))
+    module.IntVar = MagicMock(side_effect=lambda value=0, **_: StubIntVar(value))
+    module.BooleanVar = MagicMock(
+        side_effect=lambda value=False, **_: StubBooleanVar(value)
+    )
     module.Tk = MagicMock(side_effect=lambda **_: StubRoot())
     return module
 
@@ -169,4 +199,6 @@ def build_stub_ttk_module() -> SimpleNamespace:
     module.Separator = _make_widget_factory("Separator")
     module.Style = MagicMock(side_effect=lambda *args, **kwargs: MagicMock())
     module.Entry = _make_widget_factory("Entry")
+    module.Spinbox = _make_widget_factory("Spinbox")
+    module.Checkbutton = _make_widget_factory("Checkbutton")
     return module
