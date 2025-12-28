@@ -93,15 +93,13 @@ make typecheck
 make coverage
 ```
 
-You should see **no errors**, and coverage must be **≥ 80%**.
-
-GUI tests (Tkinter) may be run via:
+or
 
 ```bash
-make gui-test
+make ci
 ```
 
-They may skip automatically if Tk cannot initialize.
+You should see **no errors**, and coverage must be **≥ 80%**.
 
 ---
 
