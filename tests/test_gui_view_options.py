@@ -109,3 +109,24 @@ def test_toggle_line_wrapping(gui_stubs: SimpleNamespace) -> None:
     gui._left_viewer.text_widget.configure.assert_called_with(wrap=tk.NONE)
     assert gui._right_viewer is not None
     gui._right_viewer.text_widget.configure.assert_called_with(wrap=tk.NONE)
+
+
+def test_toggle_high_contrast(gui_stubs: SimpleNamespace, monkeypatch) -> None:
+    """Test that toggling high contrast mode updates the theme."""
+    gui, _ = _make_gui(gui_stubs)
+
+    # Mock the _apply_theme method to check if it's called
+    apply_theme_calls = []
+    monkeypatch.setattr(gui, "_apply_theme", lambda: apply_theme_calls.append(1))
+
+    assert not gui._high_contrast_enabled
+
+    # Enable high contrast
+    gui._toggle_high_contrast()
+    assert gui._high_contrast_enabled
+    assert len(apply_theme_calls) == 1
+
+    # Disable high contrast
+    gui._toggle_high_contrast()
+    assert not gui._high_contrast_enabled
+    assert len(apply_theme_calls) == 2
