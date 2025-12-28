@@ -104,9 +104,13 @@ class StubMessageBox:
     def __init__(self) -> None:
         self.info_calls: list[tuple[str, str]] = []
         self.error_calls: list[tuple[str, str]] = []
+        self.warning_calls: list[tuple[str, str]] = []
 
     def showinfo(self, *, title: str, message: str) -> None:
         self.info_calls.append((title, message))
+
+    def showwarning(self, *, title: str, message: str) -> None:
+        self.warning_calls.append((title, message))
 
     def showerror(self, *, title: str, message: str) -> None:
         self.error_calls.append((title, message))

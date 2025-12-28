@@ -243,3 +243,39 @@ def test_delete_link_undo_redo(gui_stubs: SimpleNamespace) -> None:
     gui._redo()
     assert len(project.links) == 0
     assert project.find_link_by_id("L1") is None
+
+
+def test_validate_project_success(gui_stubs: SimpleNamespace, monkeypatch: Any) -> None:
+    """Test the 'Validate Project' action for a valid project."""
+    project = Project()
+    gui, messagebox = _make_gui(gui_stubs, project=project)
+
+    def mock_validate_project(data: Any) -> list[str]:
+        return []
+
+    monkeypatch.setattr("kleuw.gui.validate_project", mock_validate_project)
+
+    gui._validate_project()
+
+    assert len(messagebox.info_calls) == 1
+    assert "successful" in messagebox.info_calls[0][1]
+    assert not messagebox.warning_calls
+
+
+def test_validate_project_failure(gui_stubs: SimpleNamespace, monkeypatch: Any) -> None:
+    """Test the 'Validate Project' action for an invalid project."""
+    project = Project()
+    gui, messagebox = _make_gui(gui_stubs, project=project)
+
+    def mock_validate_project(data: Any) -> list[str]:
+        return ["Error 1", "Error 2"]
+
+    monkeypatch.setattr("kleuw.gui.validate_project", mock_validate_project)
+
+    gui._validate_project()
+
+    assert len(messagebox.warning_calls) == 1
+    assert "failed" in messagebox.warning_calls[0][1]
+    assert "Error 1" in messagebox.warning_calls[0][1]
+    assert "Error 2" in messagebox.warning_calls[0][1]
+    assert not messagebox.info_calls
