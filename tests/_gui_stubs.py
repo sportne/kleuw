@@ -145,6 +145,7 @@ def build_stub_tk_module() -> SimpleNamespace:
     module.Scrollbar = _make_widget_factory("Scrollbar")
     module.Toplevel = _make_widget_factory("Toplevel")
     module.StringVar = MagicMock(side_effect=lambda value="", **_: StubStringVar(value))
+    module.Tk = MagicMock(side_effect=lambda **_: StubRoot())
     return module
 
 

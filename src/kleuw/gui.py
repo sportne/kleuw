@@ -300,6 +300,7 @@ class KleuwGUI:
             "Increase Font Size": self._increase_font_size,
             "Decrease Font Size": self._decrease_font_size,
             "Toggle Line Wrapping": self._toggle_line_wrapping,
+            "Recompute Hashes": self._recompute_hashes,
         }
         return callbacks.get(action, partial(self._placeholder_action, action))
 
@@ -722,6 +723,94 @@ class KleuwGUI:
         self._staleness_summary = (len(annotated), stale_count)
         self._set_stale_filter(False, force=True)
         self._show_staleness_dialog(total=len(annotated), stale=stale_count)
+
+    def _recompute_hashes(self) -> None:
+        """Recompute region hashes for all links in the project."""
+        if not self._project.links:
+            self._messagebox.showinfo(title="Kleuw", message="No links to recompute.")
+            return
+
+        if not self._messagebox.askyesno(
+            title="Kleuw",
+            message=(
+                "This will recompute hashes for all links and mark the project as "
+                "unsaved. Continue?"
+            ),
+        ):
+            return
+
+        updated_count = 0
+        errors: list[str] = []
+
+        for link_entry in self._project.links:
+            if not isinstance(link_entry, Mapping):
+                continue
+
+            link_id = str(link_entry.get("id", ""))
+            if not link_id:
+                continue
+
+            updates: dict[str, Any] = {}
+            try:
+                src_target_data = link_entry.get("src", {})
+                new_src_hash = self._recompute_target_hash(src_target_data, "source")
+                if new_src_hash:
+                    new_src = dict(src_target_data)
+                    new_src["src_region_hash"] = new_src_hash.to_dict()
+                    if "region_hash" in new_src:
+                        del new_src["region_hash"]
+                    updates["src"] = new_src
+
+                dst_target_data = link_entry.get("dst", {})
+                new_dst_hash = self._recompute_target_hash(
+                    dst_target_data, "destination"
+                )
+                if new_dst_hash:
+                    new_dst = dict(dst_target_data)
+                    new_dst["dst_region_hash"] = new_dst_hash.to_dict()
+                    if "region_hash" in new_dst:
+                        del new_dst["region_hash"]
+                    updates["dst"] = new_dst
+            except ValueError as exc:
+                errors.append(f"Link '{link_id}': {exc}")
+                continue
+
+            if updates:
+                command = UpdateLinkCommand(self._project, link_id, updates=updates)
+                self._command_history.execute(command)
+                updated_count += 1
+
+        summary = f"Successfully recomputed hashes for {updated_count} link(s)."
+        if errors:
+            summary += "\n\nThe following errors occurred:\n" + "\n".join(errors)
+        self._messagebox.showinfo(title="Kleuw", message=summary)
+
+        if updated_count > 0:
+            self._set_dirty(True)
+            self._staleness_results.clear()
+            self._staleness_summary = None
+            self._update_staleness_label()
+            self._refresh_links_panel()
+
+    def _recompute_target_hash(self, target_data: Any, label: str) -> RegionHash | None:
+        if not isinstance(target_data, Mapping):
+            return None
+
+        path = self._resolve_target_path(target_data)
+        if path is None:
+            raise ValueError(f"Could not resolve file path for {label} target.")
+
+        lines_data = target_data.get("lines")
+        lines = _line_span_from_mapping(lines_data) if lines_data is not None else None
+        start_line = lines.start if lines is not None else None
+        end_line = lines.end if lines is not None else None
+
+        try:
+            return compute_region_hash(path, start_line=start_line, end_line=end_line)
+        except (FileNotFoundError, UnicodeDecodeError, ValueError) as exc:
+            raise ValueError(
+                f"Could not compute hash for {label} ('{path}'): {exc}"
+            ) from exc
 
     def _annotate_links_with_staleness(
         self,
@@ -1492,7 +1581,7 @@ class KleuwGUI:
         except Exception:  # pragma: no cover - depends on Tk
             return
 
-    def _resolve_target_path(self, target: dict[str, Any]) -> str | None:
+    def _resolve_target_path(self, target: Mapping[str, Any]) -> str | None:
         path_value = target.get("path")
         if isinstance(path_value, str) and path_value:
             return path_value

@@ -43,39 +43,32 @@ install-dev:
 # ----- Formatting -----
 
 format:
-	$(VENV)/bin/activate
 	$(PYTHON) -m black $(SRC_DIR) $(TEST_DIR)
 	$(PYTHON) -m isort $(SRC_DIR) $(TEST_DIR)
 
 format-check:
-	$(VENV)/bin/activate
 	$(PYTHON) -m black --check $(SRC_DIR) $(TEST_DIR)
 	$(PYTHON) -m isort --check-only $(SRC_DIR) $(TEST_DIR)
 
 # ----- Linting / Static Analysis -----
 
 lint:
-	$(VENV)/bin/activate
 	$(PYTHON) -m ruff check $(SRC_DIR) $(TEST_DIR)
 
 typecheck:
-	$(VENV)/bin/activate
 	$(PYTHON) -m mypy $(SRC_DIR)
 
 # ----- Testing -----
 
 test:
-	$(VENV)/bin/activate
 	$(PYTHON) -m pytest
 
 coverage:
-	$(VENV)/bin/activate
 	$(PYTHON) -m pytest --cov=$(PACKAGE) --cov-report=term-missing --cov-fail-under=80
 
 # ----- Packaging -----
 
 package:
-	$(VENV)/bin/activate
 	@echo "Building source distribution and wheel..."
 	$(PYTHON) -m pip install --upgrade build
 	$(PYTHON) -m build
