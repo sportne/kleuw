@@ -598,7 +598,7 @@
     },
     {
       "id": "T-037",
-      "status": "to do",
+      "status": "complete",
       "title": "Implement 'Recompute Hashes' menu item",
       "description": "Implement the 'Links > Recompute Hashes' menu item to recompute the hashes for all links.",
       "depends_on": ["T-018"],
