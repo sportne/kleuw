@@ -685,6 +685,28 @@
         "spec/kleuw_ui.md"
       ],
       "est_size": "M"
+    },
+    {
+      "id": "T-044",
+      "status": "incomplete",
+      "title": "Implement high-contrast mode toggle",
+      "description": "Implement a high-contrast mode toggle in the GUI, as described in the accessibility section of the UI specification.",
+      "depends_on": ["T-014"],
+      "files": ["src/kleuw/gui.py"],
+      "category": "gui",
+      "spec_refs": ["spec/kleuw_ui.md"],
+      "est_size": "M"
+    },
+    {
+      "id": "T-045",
+      "status": "incomplete",
+      "title": "Improve keyboard navigation",
+      "description": "Improve keyboard navigation to ensure all actions are accessible, as described in the accessibility section of the UI specification.",
+      "depends_on": ["T-014"],
+      "files": ["src/kleuw/gui.py"],
+      "category": "gui",
+      "spec_refs": ["spec/kleuw_ui.md"],
+      "est_size": "M"
     }
   ]
 }
