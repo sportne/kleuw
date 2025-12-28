@@ -65,7 +65,6 @@ Status Bar (project path, dirty flag, selection summary)
 
 * Undo
 * Redo
-* Delete Link
 * Preferences
 
 **View**
@@ -288,11 +287,12 @@ Displays:
 
 ---
 
-## 12. Preferences (Deferred)
+## 12. Preferences
 
-The menu entry is present for parity with the specification but currently shows
-a placeholder dialog. Preference management (font size, relationship ordering,
-line numbers, wrapping defaults) remains a future enhancement.
+The preferences dialog allows users to configure the following settings:
+
+* **Font Size**: Adjust the font size in the text viewers.
+* **Line Wrapping**: Enable or disable line wrapping in the text viewers.
 
 ---
 

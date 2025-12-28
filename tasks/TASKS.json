@@ -653,7 +653,7 @@
     },
     {
       "id": "T-042",
-      "status": "incomplete",
+      "status": "complete",
       "title": "Fix 'Delete Link' menu item",
       "description": "Implement a single 'Delete Link' menu item, deciding on the best location for it. Update the UI specification and other documentation to reflect this change. This corrects the incomplete implementation of T-029.",
       "depends_on": [
@@ -671,7 +671,7 @@
     },
     {
       "id": "T-043",
-      "status": "incomplete",
+      "status": "complete",
       "title": "Implement 'Preferences' dialog functionality",
       "description": "Implement the 'Edit > Preferences' dialog to manage application settings, such as font size and line wrapping, as described in the UI specification. The current implementation is a placeholder.",
       "depends_on": [
