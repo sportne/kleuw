@@ -306,6 +306,7 @@ class KleuwGUI:
             "Validate Project": self._validate_project,
             "Export Summary": self._export_summary,
             "About": self._show_about_dialog,
+            "Keyboard Shortcuts": self._show_shortcuts_dialog,
         }
         return callbacks.get(action, partial(self._placeholder_action, action))
 
@@ -1144,6 +1145,51 @@ class KleuwGUI:
 
         ok_button = self._ttk.Button(button_row, text="OK", command=dialog.destroy)
         ok_button.pack(side=self._tk.LEFT)
+        ok_button.focus_set()
+
+    def _show_shortcuts_dialog(self) -> None:
+        """Display a dialog with a list of keyboard shortcuts."""
+        shortcuts = {
+            "New Project": "Ctrl+N",
+            "Open Project": "Ctrl+O",
+            "Save": "Ctrl+S",
+            "Check Staleness": "Ctrl+K",
+            "Create Link": "Ctrl+Enter",
+            "Increase Font Size": "Ctrl++",
+            "Decrease Font Size": "Ctrl+-",
+            "Toggle Line Wrapping": "Alt+W",
+            "Clear Selections": "Esc",
+        }
+
+        dialog = self._tk.Toplevel(self.root)
+        dialog.title("Keyboard Shortcuts")
+        dialog.transient(self.root)
+        dialog.grab_set()
+
+        content = self._ttk.Frame(dialog, padding=12)
+        content.pack(fill=self._tk.BOTH, expand=True)
+
+        self._ttk.Label(
+            content, text="Keyboard Shortcuts", font=("TkDefaultFont", 11, "bold")
+        ).grid(row=0, column=0, columnspan=2, sticky=self._tk.W, pady=(0, 8))
+
+        row = 1
+        for action, shortcut in shortcuts.items():
+            self._ttk.Label(content, text=action).grid(
+                row=row, column=0, sticky=self._tk.W, padx=(0, 20)
+            )
+            self._ttk.Label(content, text=shortcut).grid(
+                row=row, column=1, sticky=self._tk.W
+            )
+            row += 1
+
+        button_row = self._ttk.Frame(content)
+        button_row.grid(
+            row=row, column=0, columnspan=2, pady=(12, 0), sticky=self._tk.E
+        )
+
+        ok_button = self._ttk.Button(button_row, text="OK", command=dialog.destroy)
+        ok_button.pack()
         ok_button.focus_set()
 
     def _toggle_files_panel(self) -> None:

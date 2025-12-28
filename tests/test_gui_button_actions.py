@@ -298,3 +298,22 @@ def test_about_dialog_opens(gui_stubs: SimpleNamespace, monkeypatch: Any) -> Non
     about_callback()
 
     assert dialog_opened
+
+
+def test_shortcuts_dialog_opens(gui_stubs: SimpleNamespace, monkeypatch: Any) -> None:
+    """The 'Keyboard Shortcuts' menu action should open the shortcuts dialog."""
+    gui, _ = _make_gui(gui_stubs)
+
+    dialog_opened = False
+
+    def mock_show_shortcuts_dialog() -> None:
+        nonlocal dialog_opened
+        dialog_opened = True
+
+    monkeypatch.setattr(gui, "_show_shortcuts_dialog", mock_show_shortcuts_dialog)
+
+    # Get the callback for the 'Keyboard Shortcuts' menu item and invoke it
+    shortcuts_callback = gui._get_action_callback("Keyboard Shortcuts")
+    shortcuts_callback()
+
+    assert dialog_opened
