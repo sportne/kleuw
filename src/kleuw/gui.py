@@ -7,13 +7,14 @@ Future tasks will wire these controls into the backing project model.
 
 from __future__ import annotations
 
+import io
 import tkinter as tk
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from functools import partial
 from pathlib import Path
 from tkinter import filedialog, messagebox, ttk
-from typing import Any
+from typing import Any, TextIO
 
 from kleuw.commands import (
     CommandHistory,
@@ -303,6 +304,7 @@ class KleuwGUI:
             "Toggle Line Wrapping": self._toggle_line_wrapping,
             "Recompute Hashes": self._recompute_hashes,
             "Validate Project": self._validate_project,
+            "Export Summary": self._export_summary,
         }
         return callbacks.get(action, partial(self._placeholder_action, action))
 
@@ -1736,6 +1738,47 @@ class KleuwGUI:
             error_message += "\n".join(f"- {error}" for error in errors)
             self._messagebox.showwarning(title="Kleuw", message=error_message)
 
+    def _export_summary(self) -> None:
+        """Export a text summary of the project."""
+        path = self._filedialog.asksaveasfilename(
+            title="Export Project Summary",
+            filetypes=(("Text files", "*.txt"), ("All files", "*.*")),
+            defaultextension=".txt",
+        )
+        if not path:
+            return
+
+        try:
+            annotated = self._annotate_links_with_staleness()
+        except ValueError as exc:
+            self._messagebox.showerror(title="Kleuw", message=str(exc))
+            return
+
+        file_entries: list[dict[str, Any]] = [
+            entry for entry in self._project.files if isinstance(entry, dict)
+        ]
+        total_links = len(annotated)
+        stale_links = sum(1 for _entry, result in annotated if result.stale)
+
+        try:
+            string_io = io.StringIO()
+            _export_as_text(
+                file=string_io,
+                files=file_entries,
+                links=annotated,
+                total_links=total_links,
+                stale_links=stale_links,
+            )
+            summary_content = string_io.getvalue()
+            Path(path).write_text(summary_content, encoding="utf-8")
+            self._messagebox.showinfo(
+                title="Kleuw", message=f"Successfully exported summary to '{path}'."
+            )
+        except (OSError, ValueError) as exc:
+            self._messagebox.showerror(
+                title="Kleuw", message=f"Could not export summary to '{path}':\n{exc}"
+            )
+
     def _set_dirty(self, is_dirty: bool) -> None:
         self._is_dirty = is_dirty
         self.dirty_var.set("● Unsaved changes" if is_dirty else "● Clean")
@@ -1744,6 +1787,132 @@ class KleuwGUI:
         """Start the Tkinter main loop."""
 
         self.root.mainloop()
+
+
+def _format_optional(value: object | None) -> str:
+    """Return a placeholder when ``value`` is ``None`` or empty."""
+    if value is None:
+        return "-"
+    text = str(value)
+    return text if text.strip() else "-"
+
+
+def _normalize_hash_object(value: object | None) -> tuple[str, str] | None:
+    """Return a ``(algo, value)`` tuple for hash-like ``value``."""
+    if isinstance(value, (HashDigest, RegionHash)):
+        return value.algo, value.value
+    if isinstance(value, Mapping):
+        algo = value.get("algo")
+        digest_value = value.get("value")
+        if isinstance(algo, str) and isinstance(digest_value, str):
+            return algo, digest_value
+    return None
+
+
+def _format_hash(hash_value: object | None) -> str:
+    """Format ``hash_value`` into ``algo:value`` or ``-`` when missing."""
+    digest = _normalize_hash_object(hash_value)
+    if digest is None:
+        return "-"
+    algo, value = digest
+    return f"{algo}:{value}"
+
+
+def _print_table(
+    headers: Sequence[str], rows: Sequence[Sequence[str]], *, file: TextIO
+) -> None:
+    """Render ``rows`` under ``headers`` in a simple fixed-width table."""
+    widths = [len(header) for header in headers]
+    for row in rows:
+        for index, cell in enumerate(row):
+            widths[index] = max(widths[index], len(cell))
+
+    header_line = "  ".join(
+        header.ljust(width) for header, width in zip(headers, widths, strict=False)
+    )
+    print(header_line, file=file)
+    for row in rows:
+        line = "  ".join(
+            cell.ljust(width) for cell, width in zip(row, widths, strict=False)
+        )
+        print(line, file=file)
+
+
+def _format_target_for_summary(target: object | None) -> str:
+    """Render a ``target`` mapping into ``location[:lines]`` form."""
+    if not isinstance(target, Mapping):
+        return "-"
+    location = str(target.get("file_id") or target.get("path") or "-")
+    lines = target.get("lines")
+    if isinstance(lines, Mapping):
+        start = lines.get("start")
+        end = lines.get("end")
+        if isinstance(start, int):
+            line_suffix = f":{start}"
+            if isinstance(end, int) and end != start:
+                line_suffix = f":{start}-{end}"
+            location = f"{location}{line_suffix}"
+    return location
+
+
+def _format_reasons(reasons: Sequence[str]) -> str:
+    """Return a friendly representation of staleness ``reasons``."""
+    if not reasons:
+        return "-"
+    return "; ".join(reasons)
+
+
+def _export_as_text(
+    *,
+    file: TextIO,
+    files: Sequence[Mapping[str, Any]],
+    links: Sequence[tuple[Mapping[str, Any], LinkStalenessResult]],
+    total_links: int,
+    stale_links: int,
+) -> None:
+    """Emit human-readable tables describing files and links."""
+    file_rows: list[list[str]] = []
+    for entry in files:
+        file_rows.append(
+            [
+                str(entry.get("id", "")),
+                str(entry.get("path", "")),
+                _format_optional(entry.get("lang")),
+                _format_hash(entry.get("hash")),
+                _format_optional(entry.get("note")),
+            ]
+        )
+
+    print("Files:", file=file)
+    _print_table(["ID", "PATH", "LANG", "HASH", "NOTE"], file_rows, file=file)
+    if not file_rows:
+        print("(no files)", file=file)
+    print(file=file)
+
+    link_rows: list[list[str]] = []
+    for entry, result in links:
+        link_rows.append(
+            [
+                str(entry.get("id", "")),
+                str(entry.get("type", "")),
+                _format_target_for_summary(entry.get("src")),
+                _format_target_for_summary(entry.get("dst")),
+                "STALE" if result.stale else "OK",
+                _format_reasons(result.reasons),
+            ]
+        )
+
+    print("Links:", file=file)
+    _print_table(
+        ["ID", "TYPE", "SRC", "DST", "STATUS", "DETAILS"], link_rows, file=file
+    )
+    if not link_rows:
+        print("(no links)", file=file)
+    print(file=file)
+
+    print(f"Total links: {total_links}", file=file)
+    print(f"Stale links: {stale_links}", file=file)
+    print(f"Exported links: {len(links)}", file=file)
 
 
 def _link_from_mapping(entry: Mapping[str, Any]) -> Link:

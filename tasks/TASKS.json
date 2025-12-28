@@ -620,7 +620,7 @@
     },
     {
       "id": "T-039",
-      "status": "to do",
+      "status": "complete",
       "title": "Implement 'Export Summary' menu item",
       "description": "Implement the 'Tools > Export Summary' menu item to export a summary of the project.",
       "depends_on": ["T-014"],
