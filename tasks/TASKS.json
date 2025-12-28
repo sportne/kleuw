@@ -650,6 +650,40 @@
       "category": "gui",
       "spec_refs": ["spec/kleuw_ui.md"],
       "est_size": "S"
+    },
+    {
+      "id": "T-042",
+      "status": "incomplete",
+      "title": "Fix 'Delete Link' menu items",
+      "description": "Wire the 'Edit > Delete Link' and 'Links > Delete Link' menu items to the '_delete_selected_links' method. Task T-029 was incorrectly marked as complete.",
+      "depends_on": [
+        "T-017"
+      ],
+      "files": [
+        "src/kleuw/gui.py"
+      ],
+      "category": "gui",
+      "spec_refs": [
+        "spec/kleuw_ui.md"
+      ],
+      "est_size": "S"
+    },
+    {
+      "id": "T-043",
+      "status": "incomplete",
+      "title": "Implement 'Preferences' dialog functionality",
+      "description": "Implement the 'Edit > Preferences' dialog to manage application settings, such as font size and line wrapping, as described in the UI specification. The current implementation is a placeholder.",
+      "depends_on": [
+        "T-030"
+      ],
+      "files": [
+        "src/kleuw/gui.py"
+      ],
+      "category": "gui",
+      "spec_refs": [
+        "spec/kleuw_ui.md"
+      ],
+      "est_size": "M"
     }
   ]
 }
