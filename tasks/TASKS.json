@@ -631,7 +631,7 @@
     },
     {
       "id": "T-040",
-      "status": "to do",
+      "status": "complete",
       "title": "Implement 'About' menu item",
       "description": "Implement the 'Help > About' menu item to display an 'About' dialog.",
       "depends_on": ["T-014"],

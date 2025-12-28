@@ -279,3 +279,22 @@ def test_validate_project_failure(gui_stubs: SimpleNamespace, monkeypatch: Any) 
     assert "Error 1" in messagebox.warning_calls[0][1]
     assert "Error 2" in messagebox.warning_calls[0][1]
     assert not messagebox.info_calls
+
+
+def test_about_dialog_opens(gui_stubs: SimpleNamespace, monkeypatch: Any) -> None:
+    """The 'About' menu action should open the 'About' dialog."""
+    gui, _ = _make_gui(gui_stubs)
+
+    dialog_opened = False
+
+    def mock_show_about_dialog() -> None:
+        nonlocal dialog_opened
+        dialog_opened = True
+
+    monkeypatch.setattr(gui, "_show_about_dialog", mock_show_about_dialog)
+
+    # Get the callback for the 'About' menu item and invoke it
+    about_callback = gui._get_action_callback("About")
+    about_callback()
+
+    assert dialog_opened
