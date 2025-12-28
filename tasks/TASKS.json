@@ -654,13 +654,14 @@
     {
       "id": "T-042",
       "status": "incomplete",
-      "title": "Fix 'Delete Link' menu items",
-      "description": "Wire the 'Edit > Delete Link' and 'Links > Delete Link' menu items to the '_delete_selected_links' method. Task T-029 was incorrectly marked as complete.",
+      "title": "Fix 'Delete Link' menu item",
+      "description": "Implement a single 'Delete Link' menu item, deciding on the best location for it. Update the UI specification and other documentation to reflect this change. This corrects the incomplete implementation of T-029.",
       "depends_on": [
         "T-017"
       ],
       "files": [
-        "src/kleuw/gui.py"
+        "src/kleuw/gui.py",
+        "spec/kleuw_ui.md"
       ],
       "category": "gui",
       "spec_refs": [
