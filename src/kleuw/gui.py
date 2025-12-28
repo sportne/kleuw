@@ -305,6 +305,7 @@ class KleuwGUI:
             "Recompute Hashes": self._recompute_hashes,
             "Validate Project": self._validate_project,
             "Export Summary": self._export_summary,
+            "About": self._show_about_dialog,
         }
         return callbacks.get(action, partial(self._placeholder_action, action))
 
@@ -1108,6 +1109,33 @@ class KleuwGUI:
         content.pack(fill=self._tk.BOTH, expand=True)
 
         self._ttk.Label(content, text="Preferences are not yet implemented.").pack(
+            anchor=self._tk.W, pady=(0, 12)
+        )
+
+        button_row = self._ttk.Frame(content)
+        button_row.pack(fill=self._tk.X, anchor=self._tk.E)
+
+        ok_button = self._ttk.Button(button_row, text="OK", command=dialog.destroy)
+        ok_button.pack(side=self._tk.LEFT)
+        ok_button.focus_set()
+
+    def _show_about_dialog(self) -> None:
+        """Show the 'About' dialog."""
+        dialog = self._tk.Toplevel(self.root)
+        dialog.title("About Kleuw")
+        dialog.transient(self.root)
+        dialog.grab_set()
+
+        content = self._ttk.Frame(dialog, padding=12)
+        content.pack(fill=self._tk.BOTH, expand=True)
+
+        self._ttk.Label(content, text="Kleuw", font=("TkDefaultFont", 12, "bold")).pack(
+            anchor=self._tk.W, pady=(0, 4)
+        )
+        self._ttk.Label(
+            content, text="A tool for managing semantic file relationships."
+        ).pack(anchor=self._tk.W)
+        self._ttk.Label(content, text="Version: 0.1.0 (pre-release)").pack(
             anchor=self._tk.W, pady=(0, 12)
         )
 
