@@ -688,7 +688,7 @@
     },
     {
       "id": "T-044",
-      "status": "incomplete",
+      "status": "complete",
       "title": "Implement high-contrast mode toggle",
       "description": "Implement a high-contrast mode toggle in the GUI, as described in the accessibility section of the UI specification.",
       "depends_on": ["T-014"],

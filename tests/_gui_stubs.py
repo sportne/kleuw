@@ -197,7 +197,14 @@ def build_stub_ttk_module() -> SimpleNamespace:
     module.Combobox = _make_widget_factory("Combobox")
     module.Treeview = _make_widget_factory("Treeview")
     module.Separator = _make_widget_factory("Separator")
-    module.Style = MagicMock(side_effect=lambda *args, **kwargs: MagicMock())
+
+    def _create_fake_style(*_args: Any, **_kwargs: Any) -> MagicMock:
+        style = MagicMock(name="FakeStyle")
+        style.configure = MagicMock(name="style.configure")
+        style.map = MagicMock(name="style.map")
+        return style
+
+    module.Style = MagicMock(name="Style", side_effect=_create_fake_style)
     module.Entry = _make_widget_factory("Entry")
     module.Spinbox = _make_widget_factory("Spinbox")
     module.Checkbutton = _make_widget_factory("Checkbutton")

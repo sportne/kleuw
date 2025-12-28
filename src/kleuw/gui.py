@@ -38,6 +38,30 @@ _MAX_FONT_SIZE = 24
 _DEFAULT_FONT_SIZE = 10
 
 
+_THEME_DEFAULT = {
+    "bg": "#ffffff",
+    "fg": "#000000",
+    "select_bg": "#cfe8ff",
+    "select_fg": "#000000",
+    "disabled_fg": "#a0a0a0",
+    "gutter_bg": "#f4f4f4",
+    "stale_bg": "#fff9c4",
+    "tooltip_bg": "#ffffe0",
+}
+
+
+_THEME_HIGH_CONTRAST = {
+    "bg": "#000000",
+    "fg": "#ffff00",
+    "select_bg": "#00ffff",
+    "select_fg": "#000000",
+    "disabled_fg": "#808080",
+    "gutter_bg": "#222222",
+    "stale_bg": "#440000",
+    "tooltip_bg": "#333333",
+}
+
+
 @dataclass(frozen=True, slots=True)
 class MenuItem:
     """Menu entry description used to construct the menubar."""
@@ -103,6 +127,8 @@ MENU_DEFINITION: tuple[tuple[str, Sequence[MenuItem]], ...] = (
             MenuItem("Increase Font Size", "Make the viewers' font larger."),
             MenuItem("Decrease Font Size", "Make the viewers' font smaller."),
             MenuItem("Toggle Line Wrapping", "Enable or disable line wrapping."),
+            MenuItem(None, None),
+            MenuItem("Toggle High Contrast", "Enable or disable high contrast mode."),
         ),
     ),
     (
@@ -240,6 +266,7 @@ class KleuwGUI:
         self._command_history = CommandHistory()
         self._font_size = _DEFAULT_FONT_SIZE
         self._line_wrapping_enabled = False
+        self._high_contrast_enabled = False
         self.root = root if root is not None else self._tk.Tk(className="kleuw")
         self.root.title("Kleuw")
         self.root.geometry("1200x800")
@@ -269,8 +296,7 @@ class KleuwGUI:
         self._recent_projects: list[str] = []
         self._recent_projects_menu: Any | None = None
 
-        style = self._ttk.Style()
-        style.configure("Tooltip.TLabel", background="#ffffe0")
+        self._apply_theme()
 
         self._build_menu_bar()
         self._build_toolbar()
@@ -301,6 +327,7 @@ class KleuwGUI:
             "Increase Font Size": self._increase_font_size,
             "Decrease Font Size": self._decrease_font_size,
             "Toggle Line Wrapping": self._toggle_line_wrapping,
+            "Toggle High Contrast": self._toggle_high_contrast,
             "Recompute Hashes": self._recompute_hashes,
             "Validate Project": self._validate_project,
             "Export Summary": self._export_summary,
@@ -1281,6 +1308,71 @@ class KleuwGUI:
         if self._right_viewer:
             self._right_viewer.text_widget.configure(font=font)
             self._right_viewer.line_numbers_widget.configure(font=font)
+
+    def _toggle_high_contrast(self) -> None:
+        """Toggle high contrast mode."""
+        self._high_contrast_enabled = not self._high_contrast_enabled
+        self._apply_theme()
+
+    def _apply_theme(self) -> None:
+        """Apply the current theme to all relevant widgets."""
+        theme = _THEME_HIGH_CONTRAST if self._high_contrast_enabled else _THEME_DEFAULT
+        style = self._ttk.Style()
+        style.configure(
+            "TFrame",
+            background=theme["bg"],
+            foreground=theme["fg"],
+            fieldbackground=theme["bg"],
+        )
+        style.configure(
+            "TLabel",
+            background=theme["bg"],
+            foreground=theme["fg"],
+            fieldbackground=theme["bg"],
+        )
+        style.configure(
+            "TButton",
+            background=theme["bg"],
+            foreground=theme["fg"],
+            fieldbackground=theme["bg"],
+            selectbackground=theme["select_bg"],
+            selectforeground=theme["select_fg"],
+        )
+        style.configure(
+            "Treeview",
+            background=theme["bg"],
+            foreground=theme["fg"],
+            fieldbackground=theme["bg"],
+            selectbackground=theme["select_bg"],
+            selectforeground=theme["select_fg"],
+        )
+        style.map(
+            "TButton",
+            foreground=[("disabled", theme["disabled_fg"])],
+        )
+        style.configure(
+            "Tooltip.TLabel", background=theme["tooltip_bg"], foreground=theme["fg"]
+        )
+
+        if self._links_tree:
+            self._links_tree.tag_configure("stale", background=theme["stale_bg"])
+
+        for viewer in (self._left_viewer, self._right_viewer):
+            if viewer:
+                viewer.text_widget.configure(
+                    background=theme["bg"],
+                    foreground=theme["fg"],
+                    insertbackground=theme["fg"],
+                )
+                viewer.line_numbers_widget.configure(
+                    background=theme["gutter_bg"],
+                    foreground=theme["fg"],
+                )
+                viewer.text_widget.tag_configure(
+                    LINE_SELECTION_TAG,
+                    background=theme["select_bg"],
+                    foreground=theme["select_fg"],
+                )
 
     # ------------------------------------------------------------------
     # Files panel helpers

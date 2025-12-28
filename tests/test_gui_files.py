@@ -318,6 +318,9 @@ class _FakeStyle:
     ) -> None:  # pragma: no cover - trivial
         return None
 
+    def map(self, *_args: Any, **_kwargs: Any) -> None:  # pragma: no cover - trivial
+        return None
+
 
 class _FakeToplevel(_BaseWidget):
     def title(self, *_args: Any, **_kwargs: Any) -> None:  # pragma: no cover - noop
