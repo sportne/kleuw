@@ -31,7 +31,6 @@ help:
 	@echo "  make typecheck     - Run mypy static type checking"
 	@echo "  make test          - Run unit tests"
 	@echo "  make coverage      - Run unit tests with coverage threshold"
-	@echo "  make gui-test      - Run GUI-marked tests"
 	@echo "  make package       - Build a source distribution and wheel"
 	@echo "  make clean         - Remove build artifacts"
 	@echo "  make ci            - Run all phase checks (convenience target)"
