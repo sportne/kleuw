@@ -642,7 +642,7 @@
     },
     {
       "id": "T-041",
-      "status": "to do",
+      "status": "complete",
       "title": "Implement 'Keyboard Shortcuts' menu item",
       "description": "Implement the 'Help > Keyboard Shortcuts' menu item to display a dialog with a list of keyboard shortcuts.",
       "depends_on": ["T-014"],
