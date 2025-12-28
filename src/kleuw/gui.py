@@ -25,6 +25,7 @@ from kleuw.hashing import compute_region_hash
 from kleuw.io import load_project, save_project
 from kleuw.model import HashDigest, LineSpan, Link, LinkType, RegionHash, Target
 from kleuw.project import Project
+from kleuw.schema import validate_project
 from kleuw.staleness import LinkStalenessResult, check_link_staleness
 
 __all__ = ["KleuwGUI", "launch"]
@@ -301,6 +302,7 @@ class KleuwGUI:
             "Decrease Font Size": self._decrease_font_size,
             "Toggle Line Wrapping": self._toggle_line_wrapping,
             "Recompute Hashes": self._recompute_hashes,
+            "Validate Project": self._validate_project,
         }
         return callbacks.get(action, partial(self._placeholder_action, action))
 
@@ -1720,6 +1722,19 @@ class KleuwGUI:
         self._command_history.execute(command)
         self._set_dirty(True)
         self._refresh_links_panel(selected_id=link_id)
+
+    def _validate_project(self) -> None:
+        """Validate the current project against the schema."""
+        project_data = self._project.to_dict()
+        errors = validate_project(project_data)
+        if not errors:
+            self._messagebox.showinfo(
+                title="Kleuw", message="Project validation successful: No errors found."
+            )
+        else:
+            error_message = "Project validation failed with the following errors:\n\n"
+            error_message += "\n".join(f"- {error}" for error in errors)
+            self._messagebox.showwarning(title="Kleuw", message=error_message)
 
     def _set_dirty(self, is_dirty: bool) -> None:
         self._is_dirty = is_dirty

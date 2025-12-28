@@ -609,7 +609,7 @@
     },
     {
       "id": "T-038",
-      "status": "to do",
+      "status": "complete",
       "title": "Implement 'Validate Project' menu item",
       "description": "Implement the 'Tools > Validate Project' menu item to validate the current project against the schema.",
       "depends_on": ["T-003", "T-014"],
