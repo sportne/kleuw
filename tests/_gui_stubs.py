@@ -12,6 +12,8 @@ __all__ = [
     "StubMessageBox",
     "build_stub_tk_module",
     "build_stub_ttk_module",
+    "build_stub_filedialog_module",
+    "build_stub_messagebox_module",
 ]
 
 
@@ -120,6 +122,12 @@ class StubRoot:
     def protocol(self, name: str, handler: Any) -> None:
         self.bindings.append((name, handler))
 
+    def event_generate(self, sequence: str) -> None:
+        """Simulate a Tkinter event."""
+        for bound_sequence, handler in self.bindings:
+            if bound_sequence == sequence:
+                handler(None)
+
     def mainloop(self) -> None:  # pragma: no cover - not exercised in tests
         return None
 
@@ -209,3 +217,17 @@ def build_stub_ttk_module() -> SimpleNamespace:
     module.Spinbox = _make_widget_factory("Spinbox")
     module.Checkbutton = _make_widget_factory("Checkbutton")
     return module
+
+
+def build_stub_filedialog_module() -> SimpleNamespace:
+    """Return a filedialog-like namespace compatible with ``KleuwGUI``."""
+    module = SimpleNamespace()
+    module.askopenfilename = MagicMock(name="askopenfilename")
+    module.asksaveasfilename = MagicMock(name="asksaveasfilename")
+    module.askopenfilenames = MagicMock(name="askopenfilenames")
+    return module
+
+
+def build_stub_messagebox_module() -> StubMessageBox:
+    """Return a messagebox-like namespace compatible with ``KleuwGUI``."""
+    return StubMessageBox()
