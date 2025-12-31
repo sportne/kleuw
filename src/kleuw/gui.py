@@ -969,7 +969,7 @@ class KleuwGUI:
     # ------------------------------------------------------------------
     def _make_text_readonly(self, widget: Any) -> None:
         def _is_allowed(event: tk.Event[Any]) -> bool:
-            if event.state & 0x4 and event.keysym == "a":  # Control key
+            if int(event.state) & 0x4 and event.keysym == "a":  # Control key
                 return True
             if event.keysym in (
                 "Left",
