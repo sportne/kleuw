@@ -2008,6 +2008,41 @@ class KleuwGUI:
         self._is_dirty = is_dirty
         self.dirty_var.set("● Unsaved changes" if is_dirty else "● Clean")
 
+    def _find_text(
+        self, viewer: ViewerPane, search_term: str, start_index: str
+    ) -> None:
+        """Find the next occurrence of a search term in a viewer."""
+        if viewer is None:
+            return
+        content = self._get_widget_text(viewer.text_widget)
+        if not search_term or not content:
+            return
+
+        pos = viewer.text_widget.search(
+            search_term, start_index, nocase=True, stopindex="end"
+        )
+        if pos:
+            line, col = map(int, pos.split("."))
+            end_pos = f"{line}.{col + len(search_term)}"
+            viewer.text_widget.tag_remove(self._tk.SEL, "1.0", self._tk.END)
+            viewer.text_widget.tag_add(self._tk.SEL, pos, end_pos)
+            viewer.text_widget.mark_set(self._tk.INSERT, pos)
+            viewer.text_widget.see(pos)
+        else:
+            # If not found from the start_index, wrap around and search from the beginning
+            pos = viewer.text_widget.search(
+                search_term, "1.0", nocase=True, stopindex=start_index
+            )
+            if pos:
+                line, col = map(int, pos.split("."))
+                end_pos = f"{line}.{col + len(search_term)}"
+                viewer.text_widget.tag_remove(self._tk.SEL, "1.0", self._tk.END)
+                viewer.text_widget.tag_add(self._tk.SEL, pos, end_pos)
+                viewer.text_widget.mark_set(self._tk.INSERT, pos)
+                viewer.text_widget.see(pos)
+            else:
+                self._messagebox.showinfo("Search", f"'{search_term}' not found.")
+
     def run(self) -> None:
         """Start the Tkinter main loop."""
 
