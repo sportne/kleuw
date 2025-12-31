@@ -8,8 +8,10 @@ from unittest.mock import MagicMock
 
 __all__ = [
     "StubStringVar",
+    "StubBooleanVar",
     "StubRoot",
     "StubMessageBox",
+    "StubViewerPane",
     "build_stub_tk_module",
     "build_stub_ttk_module",
     "build_stub_filedialog_module",
@@ -153,6 +155,24 @@ class StubMessageBox:
         return getattr(self, "askyesno_response", False)
 
 
+class StubViewerPane:
+    """Minimal replacement for the ``ViewerPane`` dataclass."""
+
+    def __init__(self, label: str) -> None:
+        self.label_prefix = label
+        self.label_var = StubStringVar()
+        self.text_widget = MagicMock()
+        self.line_numbers_widget = MagicMock()
+        self.y_scroll = MagicMock()
+        self.x_scroll = MagicMock()
+        self.entire_file_var = StubBooleanVar(value=True)
+        self.file_path: str | None = None
+        self.line_count = 0
+        self.selection_start: int | None = None
+        self.selection_end: int | None = None
+        self.selection_anchor: int | None = None
+
+
 def build_stub_tk_module() -> SimpleNamespace:
     """Return a Tkinter-like namespace compatible with ``KleuwGUI``."""
 
@@ -185,9 +205,7 @@ def build_stub_tk_module() -> SimpleNamespace:
     module.Toplevel = _make_widget_factory("Toplevel")
     module.StringVar = MagicMock(side_effect=lambda value="", **_: StubStringVar(value))
     module.IntVar = MagicMock(side_effect=lambda value=0, **_: StubIntVar(value))
-    module.BooleanVar = MagicMock(
-        side_effect=lambda value=False, **_: StubBooleanVar(value)
-    )
+    module.BooleanVar = StubBooleanVar
     module.Tk = MagicMock(side_effect=lambda **_: StubRoot())
     return module
 

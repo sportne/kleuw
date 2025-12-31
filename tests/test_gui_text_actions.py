@@ -12,6 +12,34 @@ from tests._gui_stubs import (
 )
 
 
+def test_entire_file_checkbox_clears_selection(tmp_path: Path) -> None:
+    """Verify that checking the 'Entire File' checkbox clears the line selection."""
+    # Setup
+    tk_module = build_stub_tk_module()
+    sut = KleuwGUI(
+        root=StubRoot(),
+        tk_module=tk_module,
+        ttk_module=build_stub_ttk_module(),
+        messagebox_module=build_stub_messagebox_module(),
+    )
+    viewer = sut._left_viewer
+    viewer.entire_file_var.set(False)
+    viewer.selection_start = 1
+    viewer.selection_end = 5
+    viewer.text_widget.tag_remove = MagicMock()
+
+    # Action
+    viewer.entire_file_var.set(True)
+    sut._on_entire_file_toggle(viewer)
+
+    # Verification
+    viewer.text_widget.tag_remove.assert_called_once_with(
+        "line-selection", "1.0", "end"
+    )
+    assert viewer.selection_start is None
+    assert viewer.selection_end is None
+
+
 def test_select_all_text_invokes_tag_add_for_selection(tmp_path: Path) -> None:
     """Verify that the 'select all' action adds the 'SEL' tag to the whole text."""
     # Setup

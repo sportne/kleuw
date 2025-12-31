@@ -18,6 +18,7 @@ from tests._gui_stubs import (
     StubMessageBox,
     StubRoot,
     StubStringVar,
+    StubBooleanVar,
     _create_fake_menu,
 )
 
@@ -312,6 +313,16 @@ class _FakeSeparator(_BaseWidget):
     pass
 
 
+class _FakeCheckbutton(_BaseWidget):
+    def __init__(self, *_args: Any, **_kwargs: Any) -> None:
+        super().__init__()
+        self.command: Callable[..., Any] | None = None
+
+    def configure(self, **kwargs: Any) -> None:
+        if "command" in kwargs:
+            self.command = kwargs["command"]
+
+
 class _FakeStyle:
     def configure(
         self, *_args: Any, **_kwargs: Any
@@ -368,6 +379,7 @@ def functional_tk_module() -> SimpleNamespace:
     module.Scrollbar = _FakeScrollbar
     module.Toplevel = _FakeToplevel
     module.StringVar = lambda value="", **_: StubStringVar(value)  # type: ignore[assignment]
+    module.BooleanVar = lambda value=False, **_: StubBooleanVar(value)  # type: ignore[assignment]
     return module
 
 
@@ -384,6 +396,7 @@ def functional_ttk_module() -> SimpleNamespace:
     module.Treeview = _FakeTreeview
     module.Separator = _FakeSeparator
     module.Entry = _FakeEntry
+    module.Checkbutton = _FakeCheckbutton
     module.Style = lambda *args, **kwargs: _FakeStyle()
     return module
 
