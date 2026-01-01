@@ -1624,7 +1624,9 @@ class KleuwGUI:
         return str(text).rstrip("\n")
 
     def _line_span_for_viewer(self, viewer: ViewerPane) -> LineSpan | None:
-        if viewer.entire_file_var.get() or viewer.selection_start is None:
+        if viewer.entire_file_var.get():
+            return None
+        if viewer.selection_start is None:
             return None
         end = (
             viewer.selection_end
@@ -1684,6 +1686,16 @@ class KleuwGUI:
             self._messagebox.showinfo(
                 title="Kleuw",
                 message="Load files into both viewers before creating a link.",
+            )
+            return
+        if (
+            self._left_viewer.entire_file_var.get()
+            and self._right_viewer.entire_file_var.get()
+            and self._left_viewer.file_path == self._right_viewer.file_path
+        ):
+            self._messagebox.showwarning(
+                title="Kleuw",
+                message="Cannot create a file-level link to the same file.",
             )
             return
         relationship_value = self.relationship_var.get().strip()

@@ -10,10 +10,10 @@ from unittest.mock import MagicMock
 from kleuw.gui import KleuwGUI
 from kleuw.project import Project
 from tests._gui_stubs import (
+    StubBooleanVar,
     StubMessageBox,
     StubRoot,
     StubStringVar,
-    StubBooleanVar,
     _create_fake_menu,
 )
 from tests.test_gui_files import (
