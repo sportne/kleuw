@@ -343,6 +343,32 @@ class _FakeToplevel(_BaseWidget):
         return None
 
 
+class _FakeBooleanVar:
+    def __init__(self, value: bool = False) -> None:
+        self._value = value
+
+    def set(self, value: bool) -> None:
+        self._value = value
+
+    def get(self) -> bool:
+        return self._value
+
+
+class _FakeCheckbutton(_BaseWidget):
+    def __init__(
+        self, *_args: Any, variable: _FakeBooleanVar | None = None, **_kwargs: Any
+    ) -> None:
+        super().__init__()
+        self.variable = variable
+        self.command: Callable[..., Any] | None = _kwargs.get("command")
+
+    def configure(self, **kwargs: Any) -> None:
+        if "command" in kwargs:
+            self.command = kwargs["command"]
+
+    config = configure
+
+
 @pytest.fixture()
 def functional_tk_module() -> SimpleNamespace:
     module = SimpleNamespace()
@@ -368,6 +394,7 @@ def functional_tk_module() -> SimpleNamespace:
     module.Scrollbar = _FakeScrollbar
     module.Toplevel = _FakeToplevel
     module.StringVar = lambda value="", **_: StubStringVar(value)  # type: ignore[assignment]
+    module.BooleanVar = lambda value=False, **_: _FakeBooleanVar(value)  # type: ignore[assignment]
     return module
 
 
@@ -384,6 +411,7 @@ def functional_ttk_module() -> SimpleNamespace:
     module.Treeview = _FakeTreeview
     module.Separator = _FakeSeparator
     module.Entry = _FakeEntry
+    module.Checkbutton = _FakeCheckbutton
     module.Style = lambda *args, **kwargs: _FakeStyle()
     return module
 

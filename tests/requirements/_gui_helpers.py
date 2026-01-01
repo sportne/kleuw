@@ -10,6 +10,7 @@ from unittest.mock import MagicMock
 from kleuw.gui import KleuwGUI
 from kleuw.project import Project
 from tests._gui_stubs import (
+    StubBooleanVar,
     StubMessageBox,
     StubRoot,
     StubStringVar,
@@ -17,6 +18,7 @@ from tests._gui_stubs import (
 )
 from tests.test_gui_files import (
     _FakeButton,
+    _FakeCheckbutton,
     _FakeCombobox,
     _FakeEntry,
     _FakeFrame,
@@ -58,6 +60,7 @@ def build_functional_tk_module() -> SimpleNamespace:
     module.Scrollbar = _FakeScrollbar
     module.Toplevel = _FakeToplevel
     module.StringVar = _make_string_var_factory()
+    module.BooleanVar = _make_boolean_var_factory()
     return module
 
 
@@ -75,6 +78,7 @@ def build_functional_ttk_module() -> SimpleNamespace:
     module.Treeview = _FakeTreeview
     module.Separator = _FakeSeparator
     module.Entry = _FakeEntry
+    module.Checkbutton = _FakeCheckbutton
     module.Style = lambda *args, **kwargs: _FakeStyle()  # type: ignore[assignment]
     return module
 
@@ -102,5 +106,12 @@ def make_gui(*, project: Project | None = None) -> tuple[KleuwGUI, StubMessageBo
 def _make_string_var_factory() -> Callable[..., StubStringVar]:
     def _factory(value: str = "", **_: Any) -> StubStringVar:
         return StubStringVar(value)
+
+    return _factory
+
+
+def _make_boolean_var_factory() -> Callable[..., StubBooleanVar]:
+    def _factory(value: bool = False, **_: Any) -> StubBooleanVar:
+        return StubBooleanVar(value)
 
     return _factory

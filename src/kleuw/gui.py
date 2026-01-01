@@ -88,6 +88,7 @@ class ViewerPane:
     line_numbers_widget: Any
     y_scroll: Any
     x_scroll: Any
+    entire_file_var: Any
     file_path: str | None = None
     line_count: int = 0
     selection_start: int | None = None
@@ -277,6 +278,8 @@ class KleuwGUI:
         self.dirty_var = self._tk.StringVar(value="● Clean")
         self.selection_var = self._tk.StringVar(value="Selections: Left —, Right —")
         self.staleness_var = self._tk.StringVar(value="Staleness: Unknown")
+        self.left_entire_file_var = self._tk.BooleanVar(value=True)
+        self.right_entire_file_var = self._tk.BooleanVar(value=True)
         self._files: list[str] = []
         self._file_listbox: Any | None = None
         self._files_frame: Any | None = None
@@ -476,8 +479,20 @@ class KleuwGUI:
     def _build_viewer(self, parent: Any, label: str) -> ViewerPane:
         frame = self._ttk.Frame(parent)
         parent.add(frame, weight=1)
+
+        top_row = self._ttk.Frame(frame)
+        top_row.pack(fill=self._tk.X)
         label_var = self._tk.StringVar(value=f"{label} — No file loaded")
-        self._ttk.Label(frame, textvariable=label_var).pack(anchor=self._tk.W)
+        self._ttk.Label(top_row, textvariable=label_var).pack(
+            side=self._tk.LEFT,
+        )
+        entire_file_var = (
+            self.left_entire_file_var if "Left" in label else self.right_entire_file_var
+        )
+        checkbutton = self._ttk.Checkbutton(
+            top_row, text="Entire File", variable=entire_file_var
+        )
+        checkbutton.pack(side=self._tk.RIGHT)
 
         body = self._ttk.Frame(frame)
         body.pack(fill=self._tk.BOTH, expand=True)
@@ -526,7 +541,9 @@ class KleuwGUI:
             line_numbers_widget=line_numbers,
             y_scroll=y_scroll,
             x_scroll=x_scroll,
+            entire_file_var=entire_file_var,
         )
+        checkbutton.configure(command=lambda: self._on_entire_file_toggle(pane))
         text.tag_configure(LINE_SELECTION_TAG, background="#cfe8ff")
         text.bind(
             "<Button-1>",
@@ -729,6 +746,8 @@ class KleuwGUI:
         self._staleness_results = {}
         self._staleness_summary = None
         self._show_stale_only = False
+        self.left_entire_file_var.set(True)
+        self.right_entire_file_var.set(True)
         self._files.clear()
         if self._file_listbox:
             self._file_listbox.delete(0, self._tk.END)
@@ -1073,6 +1092,7 @@ class KleuwGUI:
             f"{start}.0",
             f"{end_index}.0",
         )
+        viewer.entire_file_var.set(False)
         self._update_selection_summary()
 
     def _clear_viewer_selection(self, viewer: ViewerPane) -> None:
@@ -1094,7 +1114,11 @@ class KleuwGUI:
         self.selection_var.set(f"Selections: Left {left_text}, Right {right_text}")
 
     def _format_selection(self, viewer: ViewerPane | None) -> str:
-        if viewer is None or viewer.selection_start is None:
+        if viewer is None:
+            return "—"
+        if viewer.entire_file_var.get():
+            return "Entire File"
+        if viewer.selection_start is None:
             return "—"
         end = (
             viewer.selection_end
@@ -1104,6 +1128,11 @@ class KleuwGUI:
         if end == viewer.selection_start:
             return f"L{viewer.selection_start}"
         return f"L{viewer.selection_start}–L{end}"
+
+    def _on_entire_file_toggle(self, viewer: ViewerPane) -> None:
+        """Handle clicks on the 'Entire File' checkbox."""
+        if viewer.entire_file_var.get():
+            self._clear_viewer_selection(viewer)
 
     def _update_viewer_label(self, viewer: ViewerPane) -> None:
         suffix = viewer.file_path if viewer.file_path else "No file loaded"
@@ -1595,6 +1624,8 @@ class KleuwGUI:
         return str(text).rstrip("\n")
 
     def _line_span_for_viewer(self, viewer: ViewerPane) -> LineSpan | None:
+        if viewer.entire_file_var.get():
+            return None
         if viewer.selection_start is None:
             return None
         end = (
@@ -1655,6 +1686,16 @@ class KleuwGUI:
             self._messagebox.showinfo(
                 title="Kleuw",
                 message="Load files into both viewers before creating a link.",
+            )
+            return
+        if (
+            self._left_viewer.entire_file_var.get()
+            and self._right_viewer.entire_file_var.get()
+            and self._left_viewer.file_path == self._right_viewer.file_path
+        ):
+            self._messagebox.showwarning(
+                title="Kleuw",
+                message="Cannot create a file-level link to the same file.",
             )
             return
         relationship_value = self.relationship_var.get().strip()
