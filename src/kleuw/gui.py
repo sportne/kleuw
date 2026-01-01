@@ -577,19 +577,21 @@ class KleuwGUI:
             relief=self._tk.SUNKEN,
             borderwidth=0,
         )
-        line_numbers.pack(side=self._tk.LEFT, fill=self._tk.Y)
         text = self._tk.Text(
             body,
             wrap=self._tk.WORD if self._line_wrapping_enabled else self._tk.NONE,
             height=20,
             font=(_FONT_NAME, self._font_size),
         )
-        text.pack(fill=self._tk.BOTH, expand=True, side=self._tk.LEFT)
-        self._make_text_readonly(text)
         y_scroll = self._ttk.Scrollbar(body, orient=self._tk.VERTICAL)
-        y_scroll.pack(side=self._tk.RIGHT, fill=self._tk.Y)
         x_scroll = self._ttk.Scrollbar(body, orient=self._tk.HORIZONTAL)
-        x_scroll.pack(fill=self._tk.X, side=self._tk.BOTTOM)
+
+        y_scroll.pack(side=self._tk.RIGHT, fill=self._tk.Y)
+        x_scroll.pack(side=self._tk.BOTTOM, fill=self._tk.X)
+        line_numbers.pack(side=self._tk.LEFT, fill=self._tk.Y)
+        text.pack(expand=True, fill=self._tk.BOTH)
+
+        self._make_text_readonly(text)
 
         def _on_vertical_scroll(*args: str) -> None:
             text.yview(*args)
