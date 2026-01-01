@@ -48,6 +48,11 @@ class _FakeListbox(_BaseWidget):
         super().__init__()
         self.items: list[str] = []
         self._selection: tuple[int, ...] = ()
+        self.last_yview: tuple[Any, ...] | None = None
+
+    def yview(self, *args: Any) -> None:
+        """Mock for the listbox's yview method."""
+        self.last_yview = args
 
     def insert(self, index: str | int, value: str) -> None:
         if index == "end":

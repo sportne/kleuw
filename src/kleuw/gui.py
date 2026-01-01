@@ -9,11 +9,12 @@ from __future__ import annotations
 
 import io
 import tkinter as tk
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Callable, Iterator, Mapping, Sequence
+from contextlib import contextmanager
 from dataclasses import dataclass
 from functools import partial
 from pathlib import Path
-from tkinter import filedialog, messagebox, ttk
+from tkinter import filedialog, messagebox, simpledialog, ttk
 from typing import Any, TextIO
 
 from kleuw.commands import (
@@ -97,6 +98,7 @@ class ViewerPane:
 
 
 LINE_SELECTION_TAG = "line-selection"
+SEARCH_HIGHLIGHT_TAG = "search-highlight"
 
 
 MENU_DEFINITION: tuple[tuple[str, Sequence[MenuItem]], ...] = (
@@ -240,6 +242,59 @@ def create_tooltip(widget: tk.Widget, text: str) -> None:
     widget.bind("<ButtonPress>", tooltip.hide)
 
 
+class SearchDialog(simpledialog.Dialog):
+    """Search dialog that supports forward and backward searches."""
+
+    def __init__(
+        self,
+        parent: Any,
+        title: str,
+        *,
+        initial_value: str = "",
+    ) -> None:
+        self._entry_var = tk.StringVar(value=initial_value)
+        self._result: tuple[str, bool] | None = None
+        super().__init__(parent, title=title)
+
+    def body(self, master: Any) -> tk.Widget:
+        """Create the dialog body."""
+        ttk.Label(master, text="Find:").grid(row=0, sticky=tk.W)
+        entry = ttk.Entry(master, textvariable=self._entry_var, width=40)
+        entry.grid(row=0, column=1, padx=5, pady=5)
+        return entry
+
+    def buttonbox(self) -> None:
+        """Create the dialog buttons."""
+        box = ttk.Frame(self)
+        self._next_button = ttk.Button(
+            box,
+            text="Next",
+            command=lambda: self.ok(forward=True),
+            default=tk.ACTIVE,
+        )
+        self._next_button.pack(side=tk.LEFT, padx=5, pady=5)
+        self._prev_button = ttk.Button(
+            box, text="Previous", command=lambda: self.ok(forward=False)
+        )
+        self._prev_button.pack(side=tk.LEFT, padx=5, pady=5)
+        cancel_button = ttk.Button(box, text="Cancel", command=self.cancel)
+        cancel_button.pack(side=tk.LEFT, padx=5, pady=5)
+        box.pack()
+
+        self.bind("<Return>", lambda _event: self.ok(forward=True))
+        self.bind("<Escape>", lambda _event: self.cancel())
+
+    def ok(self, *, forward: bool) -> None:  # type: ignore[override]
+        """Handle 'Next' and 'Previous' button clicks."""
+        self._result = (self._entry_var.get(), forward)
+        super().ok()
+
+    def show(self) -> tuple[str, bool] | None:
+        """Show the dialog and return the search term and direction."""
+        self.wait_window(self)
+        return self._result
+
+
 class KleuwGUI:
     """Tkinter GUI shell matching the Kleuw UI specification."""
 
@@ -298,6 +353,10 @@ class KleuwGUI:
         self._link_tooltip: Tooltip | None = None
         self._recent_projects: list[str] = []
         self._recent_projects_menu: Any | None = None
+        self._search_term: str = ""
+        self._last_search_viewer: ViewerPane | None = None
+        self._last_search_index: str | None = None
+        self._search_dialog: SearchDialog | None = None
 
         self._apply_theme()
 
@@ -337,6 +396,7 @@ class KleuwGUI:
             "Export Summary": self._export_summary,
             "About": self._show_about_dialog,
             "Keyboard Shortcuts": self._show_shortcuts_dialog,
+            "Find": self._find_text,
         }
         return callbacks.get(action, partial(self._placeholder_action, action))
 
@@ -400,8 +460,18 @@ class KleuwGUI:
         self._ttk.Label(
             parent, text="Project Files", font=("TkDefaultFont", 10, "bold")
         ).pack(anchor=self._tk.W)
-        self._file_listbox = self._tk.Listbox(parent, height=15, activestyle="dotbox")
-        self._file_listbox.pack(fill=self._tk.BOTH, expand=True, pady=(4, 8))
+        list_frame = self._ttk.Frame(parent)
+        list_frame.pack(fill=self._tk.BOTH, expand=True, pady=(4, 8))
+        scrollbar = self._ttk.Scrollbar(list_frame, orient=self._tk.VERTICAL)
+        self._file_listbox = self._tk.Listbox(
+            list_frame,
+            height=15,
+            activestyle="dotbox",
+            yscrollcommand=scrollbar.set,
+        )
+        scrollbar.config(command=self._file_listbox.yview)
+        scrollbar.pack(side=self._tk.RIGHT, fill=self._tk.Y)
+        self._file_listbox.pack(fill=self._tk.BOTH, expand=True, side=self._tk.LEFT)
         self._file_listbox.bind(
             "<Double-Button-1>",
             lambda _event: self._open_selection_in_viewer("left"),
@@ -1160,6 +1230,7 @@ class KleuwGUI:
             "<Control-plus>": "Increase Font Size",
             "<Control-minus>": "Decrease Font Size",
             "<Alt-w>": "Toggle Line Wrapping",
+            "<Control-f>": "Find",
         }
         for sequence, action in placeholder_bindings.items():
             self.root.bind(sequence, self._shortcut_handler(action))
@@ -1383,6 +1454,105 @@ class KleuwGUI:
             self._right_viewer.text_widget.configure(font=font)
             self._right_viewer.line_numbers_widget.configure(font=font)
 
+    def _find_text(self) -> None:
+        """Open a dialog to search for text in the active viewer."""
+        active_viewer = self._get_active_viewer()
+        if not active_viewer:
+            return
+
+        if self._search_dialog:
+            self._search_dialog.lift()
+            return
+
+        self._search_dialog = SearchDialog(
+            self.root,
+            title="Find",
+            initial_value=self._search_term,
+        )
+        result = self._search_dialog.show()
+        self._search_dialog = None
+
+        if result:
+            term, forward = result
+            if term:
+                self._search_term = term
+                self._perform_search(active_viewer, term, forward=forward)
+
+    def _get_active_viewer(self) -> ViewerPane | None:
+        """Return the viewer pane that last had focus."""
+        try:
+            focused_widget = self.root.focus_get()
+        except KeyError:  # pragma: no cover - Tk can throw error on shutdown
+            return None
+        if focused_widget is None:
+            return None
+        if self._left_viewer and focused_widget is self._left_viewer.text_widget:
+            return self._left_viewer
+        if self._right_viewer and focused_widget is self._right_viewer.text_widget:
+            return self._right_viewer
+        return None
+
+    def _perform_search(
+        self,
+        viewer: ViewerPane,
+        term: str,
+        *,
+        forward: bool,
+    ) -> None:
+        """Search for the term in the specified viewer."""
+        widget = viewer.text_widget
+        start_index = self._get_search_start_index(viewer, forward=forward)
+        self._clear_search_highlight(viewer)
+
+        try:
+            with self._unlock_text_widget(widget):
+                found_index = widget.search(
+                    term,
+                    start_index,
+                    stopindex="1.0" if not forward else self._tk.END,
+                    backwards=not forward,
+                    nocase=True,
+                )
+        except self._tk.TclError:  # pragma: no cover - Tk fallback
+            return
+
+        if found_index:
+            self._highlight_search_result(viewer, term, found_index)
+        else:
+            self._messagebox.showinfo(title="Kleuw", message="Text not found.")
+
+    def _get_search_start_index(self, viewer: ViewerPane, *, forward: bool) -> str:
+        """Determine the starting index for the next search."""
+        widget = viewer.text_widget
+        if self._last_search_viewer is viewer and self._last_search_index:
+            if forward:
+                return f"{self._last_search_index}+{len(self._search_term)}c"
+            return self._last_search_index
+        try:
+            return str(widget.index(self._tk.INSERT))
+        except self._tk.TclError:  # pragma: no cover - Tk fallback
+            return "1.0"
+
+    def _highlight_search_result(
+        self,
+        viewer: ViewerPane,
+        term: str,
+        found_index: str,
+    ) -> None:
+        """Highlight the found text and update the search state."""
+        widget = viewer.text_widget
+        end_index = f"{found_index}+{len(term)}c"
+        widget.tag_add(SEARCH_HIGHLIGHT_TAG, found_index, end_index)
+        widget.see(found_index)
+        self._last_search_viewer = viewer
+        self._last_search_index = found_index
+
+    def _clear_search_highlight(self, viewer: ViewerPane | None) -> None:
+        """Clear the search highlight from the specified viewer."""
+        if viewer is None:
+            return
+        viewer.text_widget.tag_remove(SEARCH_HIGHLIGHT_TAG, "1.0", self._tk.END)
+
     def _toggle_high_contrast(self) -> None:
         """Toggle high contrast mode."""
         self._high_contrast_enabled = not self._high_contrast_enabled
@@ -1446,6 +1616,11 @@ class KleuwGUI:
                     LINE_SELECTION_TAG,
                     background=theme["select_bg"],
                     foreground=theme["select_fg"],
+                )
+                viewer.text_widget.tag_configure(
+                    SEARCH_HIGHLIGHT_TAG,
+                    background=theme.get("search_bg", "yellow"),
+                    foreground=theme.get("search_fg", "black"),
                 )
 
     # ------------------------------------------------------------------
@@ -2075,6 +2250,16 @@ class KleuwGUI:
     def _set_dirty(self, is_dirty: bool) -> None:
         self._is_dirty = is_dirty
         self.dirty_var.set("● Unsaved changes" if is_dirty else "● Clean")
+
+    @contextmanager
+    def _unlock_text_widget(self, widget: Any) -> Iterator[None]:
+        """Temporarily make a text widget writable."""
+        original_state = widget.cget("state")
+        widget.configure(state=self._tk.NORMAL)
+        try:
+            yield
+        finally:
+            widget.configure(state=original_state)
 
     def run(self) -> None:
         """Start the Tkinter main loop."""

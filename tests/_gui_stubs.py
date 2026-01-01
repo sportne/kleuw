@@ -175,6 +175,8 @@ def build_stub_tk_module() -> SimpleNamespace:
     module.NORMAL = "normal"
     module.SUNKEN = "sunken"
     module.SEL = "sel"
+    module.INSERT = "insert"
+    module.TclError = RuntimeError
     module.Menu = MagicMock(name="Menu", side_effect=_create_fake_menu)
     module.Listbox = _make_widget_factory("Listbox")
     text_widget_mock = MagicMock()
