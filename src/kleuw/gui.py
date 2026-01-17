@@ -25,7 +25,15 @@ from kleuw.commands import (
 )
 from kleuw.hashing import compute_region_hash
 from kleuw.io import load_project, save_project
-from kleuw.model import HashDigest, LineSpan, Link, LinkType, RegionHash, Target
+from kleuw.model import (
+    FileEntry,
+    HashDigest,
+    LineSpan,
+    Link,
+    LinkType,
+    RegionHash,
+    Target,
+)
 from kleuw.project import Project
 from kleuw.schema import validate_project
 from kleuw.staleness import LinkStalenessResult, check_link_staleness
@@ -1647,6 +1655,10 @@ class KleuwGUI:
                 normalized = str(expanded)
             if normalized and normalized not in self._files:
                 self._files.append(normalized)
+                if not self._project.find_file_by_path(normalized):
+                    file_id = self._generate_file_id()
+                    self._project.add_file(FileEntry(id=file_id, path=normalized))
+                    self._set_dirty(True)
                 if self._file_listbox is not None:
                     self._file_listbox.insert(self._tk.END, normalized)
 
@@ -1658,7 +1670,11 @@ class KleuwGUI:
         )
         for index in indices:
             if 0 <= index < len(self._files):
-                self._files.pop(index)
+                path = self._files.pop(index)
+                file_entry = self._project.find_file_by_path(path)
+                if file_entry:
+                    self._project.remove_file(str(file_entry["id"]))
+                    self._set_dirty(True)
                 self._file_listbox.delete(index)
 
     def _open_selection_in_viewer(self, side: str) -> None:
@@ -1820,13 +1836,22 @@ class KleuwGUI:
             viewer.file_path, lines=lines, label=label
         )
         file_entry = self._project.find_file_by_path(viewer.file_path)
-        if file_entry is not None:
-            file_id = file_entry.get("id") if isinstance(file_entry, dict) else None
-            if file_id:
-                return Target(
-                    file_id=str(file_id), lines=lines, region_hash=region_hash
-                )
-        return Target(path=viewer.file_path, lines=lines, region_hash=region_hash)
+        if file_entry is None:
+            file_id = self._generate_file_id()
+            file_entry = self._project.add_file(
+                FileEntry(id=file_id, path=viewer.file_path)
+            )
+            self._set_dirty(True)
+
+            # GUI Sync: Ensure the newly added file appears in the Project Files panel
+            path = viewer.file_path
+            if path not in self._files:
+                self._files.append(path)
+                if self._file_listbox is not None:
+                    self._file_listbox.insert(self._tk.END, path)
+
+        file_id = str(file_entry["id"])
+        return Target(file_id=file_id, lines=lines, region_hash=region_hash)
 
     def _compute_target_hash(
         self, path: str, *, lines: LineSpan | None, label: str
@@ -1845,6 +1870,14 @@ class KleuwGUI:
             ) from exc
         except ValueError as exc:
             raise ValueError(f"Invalid line range for {label}: {exc}") from exc
+
+    def _generate_file_id(self) -> str:
+        counter = 1
+        while True:
+            candidate = f"file-{counter}"
+            if not self._project.find_file_by_id(candidate):
+                return candidate
+            counter += 1
 
     def _generate_link_id(self) -> str:
         counter = 1
