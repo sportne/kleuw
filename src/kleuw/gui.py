@@ -358,6 +358,7 @@ class KleuwGUI:
         self._staleness_results: dict[str, LinkStalenessResult] = {}
         self._staleness_summary: tuple[int, int] | None = None
         self._show_stale_only = False
+        self._selection_summary_label: Any | None = None
         self._link_tooltip: Tooltip | None = None
         self._recent_projects: list[str] = []
         self._recent_projects_menu: Any | None = None
@@ -547,11 +548,12 @@ class KleuwGUI:
             command=self._create_link,
         )
         self._create_link_button.pack(side=self._tk.LEFT, padx=4)
-        self._ttk.Label(
+        self._selection_summary_label = self._ttk.Label(
             controls,
             textvariable=self.selection_var,
             foreground="#555555",
-        ).pack(side=self._tk.RIGHT)
+        )
+        self._selection_summary_label.pack(side=self._tk.RIGHT)
         self._update_create_button_state()
 
     def _build_viewer(self, parent: Any, label: str) -> ViewerPane:
@@ -1607,9 +1609,51 @@ class KleuwGUI:
         style.configure(
             "Tooltip.TLabel", background=theme["tooltip_bg"], foreground=theme["fg"]
         )
+        style.configure(
+            "TEntry",
+            fieldbackground=theme["bg"],
+            foreground=theme["fg"],
+            insertcolor=theme["fg"],
+        )
+        style.configure(
+            "TCombobox",
+            fieldbackground=theme["bg"],
+            foreground=theme["fg"],
+            selectbackground=theme["select_bg"],
+            selectforeground=theme["select_fg"],
+        )
+        style.configure(
+            "TSpinbox",
+            fieldbackground=theme["bg"],
+            foreground=theme["fg"],
+        )
+        style.configure(
+            "TCheckbutton",
+            background=theme["bg"],
+            foreground=theme["fg"],
+        )
+        style.configure(
+            "TSeparator",
+            background=theme["fg"],
+        )
+
+        self.root.config(background=theme["bg"])
+        if self._selection_summary_label:
+            self._selection_summary_label.configure(
+                background=theme["bg"],
+                foreground=theme.get("secondary_fg", theme["fg"]),
+            )
 
         if self._links_tree:
             self._links_tree.tag_configure("stale", background=theme["stale_bg"])
+
+        if self._file_listbox:
+            self._file_listbox.configure(
+                background=theme["bg"],
+                foreground=theme["fg"],
+                selectbackground=theme["select_bg"],
+                selectforeground=theme["select_fg"],
+            )
 
         for viewer in (self._left_viewer, self._right_viewer):
             if viewer:
