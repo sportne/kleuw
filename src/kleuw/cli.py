@@ -66,6 +66,11 @@ def _add_init_parser(subparsers: SubparserCollection) -> None:
     )
     parser.add_argument("project", help="Path to the project JSON file to initialize")
     parser.add_argument(
+        "files",
+        nargs="*",
+        help="Optional file paths to add to the project during initialization",
+    )
+    parser.add_argument(
         "--force",
         action="store_true",
         help="Overwrite the project file if it already exists",
@@ -797,10 +802,12 @@ def _build_target(
 
     region_hash = _compute_target_hash(path_text, lines=lines, label=label)
     file_entry = project.find_file_by_path(path_text)
-    if file_entry is not None:
-        file_id = str(file_entry["id"])
-        return Target(file_id=file_id, lines=lines, region_hash=region_hash)
-    return Target(path=path_text, lines=lines, region_hash=region_hash)
+    if file_entry is None:
+        file_id = _generate_file_id(project)
+        file_entry = project.add_file(FileEntry(id=file_id, path=path_text))
+
+    file_id = str(file_entry["id"])
+    return Target(file_id=file_id, lines=lines, region_hash=region_hash)
 
 
 def _compute_target_hash(
@@ -827,6 +834,7 @@ def _compute_target_hash(
 def _handle_init(args: Namespace) -> int:
     """Create a new Kleuw project JSON file."""
 
+    file_list = getattr(args, "files", [])
     project_path = Path(args.project)
     if project_path.exists() and not args.force:
         _print_error(
@@ -841,6 +849,25 @@ def _handle_init(args: Namespace) -> int:
         return 1
 
     project = Project(version=1)
+    for path_str in file_list:
+        file_path = Path(path_str)
+        if not file_path.is_file():
+            _print_error(f"File '{file_path}' does not exist or is not a file.")
+            return 1
+
+        try:
+            normalized_path = str(file_path.resolve())
+        except OSError:
+            normalized_path = str(file_path)
+
+        file_id = _generate_file_id(project)
+        entry = FileEntry(id=file_id, path=normalized_path)
+        try:
+            project.add_file(entry)
+        except ValueError as exc:
+            _print_error(str(exc))
+            return 1
+
     try:
         save_project(project_path, project)
     except ProjectIOError as exc:

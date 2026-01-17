@@ -28,8 +28,8 @@ def test_fr_7_prefers_file_id_for_known_paths(tmp_path: Path) -> None:
     assert target.path is None
 
 
-def test_fr_7_falls_back_to_path_when_untracked(tmp_path: Path) -> None:
-    """FR-7: untracked paths are referenced directly."""
+def test_fr_7_automatically_adds_untracked_paths(tmp_path: Path) -> None:
+    """FR-7: untracked paths are automatically added to the project catalog."""
 
     untracked_path = tmp_path / "orphan.txt"
     untracked_path.write_text("beta", encoding="utf-8")
@@ -39,5 +39,11 @@ def test_fr_7_falls_back_to_path_when_untracked(tmp_path: Path) -> None:
         project, path_text=str(untracked_path), lines=None, label="destination"
     )
 
-    assert target.file_id is None
-    assert target.path == str(untracked_path)
+    # Now the target should have a file_id because it was auto-added
+    assert target.file_id is not None
+    assert target.path is None
+
+    # Verify it was added to the project
+    entry = project.find_file_by_id(target.file_id)
+    assert entry is not None
+    assert entry["path"] == str(untracked_path)
