@@ -30,6 +30,7 @@ The tool is intended as a foundation for future digital thread tooling.
 ### 3.2 File Catalog
 
 * **FR-5:** Users shall be able to add file paths to the project.
+    * **FR-5.1:** The GUI shall allow adding all files contained in a selected directory (recursively), ignoring duplicate paths.
 * **FR-6:** `kleuw add-file` shall verify that the referenced path exists and can optionally store a `sha256` hash when `--hash` is supplied.
 * **FR-7:** Kleuw shall allow referencing a file by path or by a stable file identifier, automatically preferring `file_id` when a project entry matches the on-disk path.
 * **FR-8:** If a file is missing or cannot be decoded, Kleuw shall report the corresponding links as stale.

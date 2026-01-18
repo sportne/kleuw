@@ -61,6 +61,23 @@ def test_add_files_calls_file_dialog(gui_stubs: SimpleNamespace) -> None:
     assert "title" in filedialog_calls[0]
 
 
+def test_add_directory_calls_directory_dialog(gui_stubs: SimpleNamespace) -> None:
+    """The 'Add Folder' action should open a directory dialog."""
+    filedialog_calls = []
+
+    def _mock_askdirectory(**kwargs: str) -> str:
+        filedialog_calls.append(kwargs)
+        return ""
+
+    filedialog = SimpleNamespace(askdirectory=_mock_askdirectory)
+    gui, _ = _make_gui(gui_stubs, filedialog)
+
+    gui._add_directory()
+
+    assert len(filedialog_calls) == 1
+    assert "title" in filedialog_calls[0]
+
+
 def test_check_staleness_with_no_links(gui_stubs: SimpleNamespace) -> None:
     """'Check Staleness' should handle projects with no links gracefully."""
     project = Project()

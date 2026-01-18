@@ -31,7 +31,8 @@ This document guides implementation but includes **no code**.
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │ Menu Bar: File | Edit | View | Links | Tools | Help                         │
 ├─────────────────────────────────────────────────────────────────────────────┤
-│ Toolbar: [New] [Open] [Save] | [Add File] [Check Staleness] [Create Link]   │
+│ Toolbar: [New] [Open] [Save] | [Add File] [Add Folder] [Check Staleness]    │
+│          [Create Link]                                                     │
 ├───────────────┬─────────────────────────────────────────────────────────────┤
 │ Files Panel    │ Link Workspace                                              │
 │ (project)      │                                                             │
@@ -106,6 +107,7 @@ The toolbar contains quick-access buttons:
 * **Open** – load an existing project
 * **Save** – save the current project
 * **Add File** – add a source file to the project
+* **Add Folder** – add all files from a selected folder
 * **Check Staleness** – recompute region hashes for all links
 * **Create Link** – create a new link from current selections
 
@@ -124,14 +126,15 @@ A left-side vertical panel showing the project’s known files:
 ### Contents
 
 * **Listbox or Treeview** of file paths
-* Buttons: **Add File**, **Remove File**, **Open Left**, **Open Right**
+* Buttons: **Add File**, **Add Folder**, **Remove File**, **Open Left**, **Open Right**
 
 ### Behavior
 
 * Double-click a file to open it in the Left viewer
 * Shift+Double-click to open in the Right viewer
-* Buttons provide explicit **Add File**, **Remove File**, **Open Left**, and **Open Right** actions
+* Buttons provide explicit **Add File**, **Add Folder**, **Remove File**, **Open Left**, and **Open Right** actions
 * “Add File” uses the platform file dialog to append normalized paths (duplicates are ignored)
+* “Add Folder” uses the platform directory picker to append all files within the selected folder (recursively), ignoring duplicates
 * Removing a file only affects the panel’s local list and does not touch the project’s tracked files
 
 ---
