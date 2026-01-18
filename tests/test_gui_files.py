@@ -484,6 +484,47 @@ def test_add_files_uses_dialog_and_populates_listbox(
     assert filedialog_calls[-1]["title"].startswith("Add")
 
 
+def test_add_directory_adds_all_files(
+    tmp_path: Path,
+    functional_tk_module: SimpleNamespace,
+    functional_ttk_module: SimpleNamespace,
+    stub_messagebox: StubMessageBox,
+) -> None:
+    root_dir = tmp_path / "root"
+    root_dir.mkdir()
+    nested_dir = root_dir / "nested"
+    nested_dir.mkdir()
+    file_a = root_dir / "alpha.txt"
+    file_b = nested_dir / "beta.txt"
+    file_a.write_text("alpha")
+    file_b.write_text("beta")
+    filedialog_calls: list[dict[str, Any]] = []
+
+    def _askdirectory(**kwargs: Any) -> str:
+        filedialog_calls.append(kwargs)
+        return str(root_dir)
+
+    filedialog = SimpleNamespace(
+        askopenfilenames=lambda **_: (),
+        askdirectory=_askdirectory,
+    )
+    gui = _make_gui(
+        StubRoot(),
+        functional_tk_module,
+        functional_ttk_module,
+        stub_messagebox,
+        filedialog,
+    )
+
+    gui._add_directory()
+
+    expected = [str(file_a), str(file_b)]
+    assert gui._files == expected
+    assert gui._file_listbox is not None
+    assert gui._file_listbox.items == expected  # type: ignore[union-attr]
+    assert filedialog_calls[-1]["title"].startswith("Add")
+
+
 def test_open_selected_file_loads_left_viewer(
     tmp_path: Path,
     functional_tk_module: SimpleNamespace,

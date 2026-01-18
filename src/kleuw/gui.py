@@ -37,6 +37,7 @@ from kleuw.model import (
 from kleuw.project import Project
 from kleuw.schema import validate_project
 from kleuw.staleness import LinkStalenessResult, check_link_staleness
+from kleuw.utils import collect_files_in_directory
 
 __all__ = ["KleuwGUI", "launch"]
 
@@ -174,6 +175,7 @@ TOOLBAR_BUTTONS: tuple[ToolbarButton, ...] = (
     ToolbarButton("Open", "Open an existing project."),
     ToolbarButton("Save", "Save the current project."),
     ToolbarButton("Add File", "Add a file to the project."),
+    ToolbarButton("Add Folder", "Add all files from a folder."),
     ToolbarButton("Check Staleness", "Recompute all link hashes."),
     ToolbarButton("Create Link", "Create a link from the current selections."),
 )
@@ -181,6 +183,7 @@ TOOLBAR_BUTTONS: tuple[ToolbarButton, ...] = (
 
 FILE_PANEL_BUTTONS: tuple[ToolbarButton, ...] = (
     ToolbarButton("Add File", "Add a source file to the project."),
+    ToolbarButton("Add Folder", "Add all files from a folder."),
     ToolbarButton("Remove File", "Remove the selected file from the project."),
     ToolbarButton("Open Left", "Open the selected file in the left viewer."),
     ToolbarButton("Open Right", "Open the selected file in the right viewer."),
@@ -387,6 +390,7 @@ class KleuwGUI:
             "Save As": self._save_project_as,
             "Exit": self._exit_app,
             "Add File": self._add_files,
+            "Add Folder": self._add_directory,
             "Check Staleness": self._run_staleness_check,
             "Create Link": self._create_link,
             "Undo": self._undo,
@@ -494,6 +498,7 @@ class KleuwGUI:
         button_frame.pack(fill=self._tk.X)
         button_actions: dict[str, Callable[[], None]] = {
             "Add File": self._add_files,
+            "Add Folder": self._add_directory,
             "Remove File": self._remove_selected_files,
             "Open Left": lambda: self._open_selection_in_viewer("left"),
             "Open Right": lambda: self._open_selection_in_viewer("right"),
@@ -1691,20 +1696,46 @@ class KleuwGUI:
         )
         if not selection:
             return
-        for raw_path in selection:
-            expanded = Path(raw_path).expanduser()
-            try:
-                normalized = str(expanded.resolve())
-            except OSError:
-                normalized = str(expanded)
-            if normalized and normalized not in self._files:
-                self._files.append(normalized)
-                if not self._project.find_file_by_path(normalized):
-                    file_id = self._generate_file_id()
-                    self._project.add_file(FileEntry(id=file_id, path=normalized))
-                    self._set_dirty(True)
-                if self._file_listbox is not None:
-                    self._file_listbox.insert(self._tk.END, normalized)
+        self._add_file_paths(selection)
+
+    def _add_directory(self) -> None:
+        if not hasattr(self._filedialog, "askdirectory"):
+            self._messagebox.showinfo(
+                title="Kleuw", message="Directory dialogs are unavailable."
+            )
+            return
+        selection = self._filedialog.askdirectory(title="Add folder to Kleuw project")
+        if not selection:
+            return
+        expanded = Path(selection).expanduser()
+        try:
+            resolved = expanded.resolve()
+        except OSError:
+            resolved = expanded
+        for path in collect_files_in_directory(resolved):
+            self._add_file_path(str(path))
+
+    def _add_file_paths(self, paths: Sequence[str]) -> None:
+        for raw_path in paths:
+            self._add_file_path(raw_path)
+
+    def _add_file_path(self, raw_path: str) -> None:
+        normalized = self._normalize_path(raw_path)
+        if normalized and normalized not in self._files:
+            self._files.append(normalized)
+            if not self._project.find_file_by_path(normalized):
+                file_id = self._generate_file_id()
+                self._project.add_file(FileEntry(id=file_id, path=normalized))
+                self._set_dirty(True)
+            if self._file_listbox is not None:
+                self._file_listbox.insert(self._tk.END, normalized)
+
+    def _normalize_path(self, raw_path: str) -> str:
+        expanded = Path(raw_path).expanduser()
+        try:
+            return str(expanded.resolve())
+        except OSError:
+            return str(expanded)
 
     def _remove_selected_files(self) -> None:
         if self._file_listbox is None:
